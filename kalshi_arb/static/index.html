@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalshi Economics Arbitrage</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2;
+  --surface-1: #fcfcfb;
+  --surface-2: #f0efec;
+  --border: #e2e1dc;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --accent: #2a78d6;
+  --series-1: #2a78d6;
+  --grid: #e8e7e3;
+  --good: #0ca30c;
+  --good-ink: #0a7a0a;
+  --good-bg: #e6f5e6;
+  --warning: #fab219;
+  --warning-ink: #8a5a00;
+  --warning-bg: #fdf3dc;
+  --critical: #d03b3b;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --surface-1: #1a1a19; --surface-2: #242422; --border: #33332f;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+    --accent: #3987e5; --series-1: #3987e5; --grid: #2c2c29;
+    --good-ink: #4cc94c; --good-bg: #183018; --warning-ink: #fab219; --warning-bg: #3a2e12;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --surface-1: #1a1a19; --surface-2: #242422; --border: #33332f;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+  --accent: #3987e5; --series-1: #3987e5; --grid: #2c2c29;
+  --good-ink: #4cc94c; --good-bg: #183018; --warning-ink: #fab219; --warning-bg: #3a2e12;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text-primary);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 { font-size: 16px; margin: 0; }
+.sub { color: var(--text-secondary); margin: 0; }
+.status { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; flex-wrap: wrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); display: inline-block; margin-right: 6px; }
+.dot.live { background: var(--good); }
+.dot.busy { background: var(--warning); animation: pulse 1s infinite alternate; }
+@keyframes pulse { to { opacity: .35; } }
+button, select, input {
+  font: inherit; color: var(--text-primary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+}
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.tile .label { color: var(--text-secondary); font-size: 12px; }
+.tile .value { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tile .note { color: var(--text-muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
+.card-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.card-head p { margin: 2px 0 0; color: var(--text-secondary); font-size: 13px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+.filters label { display: inline-flex; gap: 6px; align-items: center; color: var(--text-secondary); }
+.scroll { overflow-x: auto; }
+.scroll.tall { max-height: 560px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--grid); vertical-align: top; white-space: nowrap; }
+th { font-size: 12px; font-weight: 500; color: var(--text-secondary); background: var(--surface-2); position: sticky; top: 0; cursor: pointer; user-select: none; }
+th.num, td.num { text-align: right; }
+th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; }
+th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; }
+tbody tr:hover { background: var(--surface-2); }
+td.event { white-space: normal; min-width: 220px; max-width: 360px; }
+td.event a { color: var(--text-primary); text-decoration: none; font-weight: 500; }
+td.event a:hover { text-decoration: underline; }
+.tick { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
+.legs { font-family: var(--mono); font-size: 12px; white-space: normal; min-width: 260px; }
+.legs div { white-space: nowrap; }
+.side { display: inline-block; width: 30px; font-weight: 600; }
+.pos { color: var(--good-ink); font-weight: 600; }
+.neg { color: var(--text-secondary); }
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 7px; border-radius: 999px; white-space: nowrap; margin: 1px 2px 1px 0; }
+.badge.ok { background: var(--good-bg); color: var(--good-ink); }
+.badge.warn { background: var(--warning-bg); color: var(--warning-ink); }
+.badge.muted { background: var(--surface-2); color: var(--text-secondary); }
+.empty { padding: 28px 16px; text-align: center; color: var(--text-secondary); }
+.empty strong { display: block; color: var(--text-primary); font-size: 15px; margin-bottom: 4px; }
+.chart-box { padding: 12px 16px 16px; position: relative; }
+.chart-box svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-box text { fill: var(--text-secondary); font-size: 11px; }
+.chart-box .bar-label { fill: var(--text-primary); font-size: 12px; }
+.tooltip { position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); max-width: 320px; display: none; z-index: 5; }
+.tooltip b { display: block; margin-bottom: 2px; }
+.method { color: var(--text-secondary); font-size: 13px; padding: 4px 16px 12px; }
+.method dt { color: var(--text-primary); font-weight: 600; margin-top: 10px; }
+.method dd { margin: 2px 0 0; }
+.error { background: var(--warning-bg); color: var(--warning-ink); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; display: none; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 12px; }
+.seg button[aria-pressed="true"] { background: var(--surface-2); font-weight: 600; }
+footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
+@media (max-width: 640px) {
+  .tile .value { font-size: 22px; }
+  header { align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Kalshi Economics Arbitrage</h1>
+      <p class="sub">Baskets of contracts whose guaranteed payout is worth more than their cost to buy right now, after taker fees.</p>
+    </div>
+    <div class="status">
+      <span id="status"><span class="dot"></span>Connecting…</span>
+      <button id="refresh" type="button">Rescan now</button>
+    </div>
+  </header>
+
+  <div class="error" id="error"></div>
+
+  <section class="kpis" id="kpis" aria-label="Summary"></section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Arbitrage opportunities</h2>
+        <p>Profitable after fees, at the depth available on the best price level.</p>
+      </div>
+      <div class="filters">
+        <select id="f-strategy" aria-label="Strategy">
+          <option value="">All strategies</option>
+          <option value="me_all_no">Buy every NO</option>
+          <option value="me_all_yes">Buy every YES</option>
+          <option value="ladder">Strike-ladder inversion</option>
+        </select>
+        <label><input type="checkbox" id="f-unverified" checked> Show needs-review</label>
+        <input type="search" id="f-search" placeholder="Filter by event or ticker" aria-label="Search">
+      </div>
+    </div>
+    <div class="scroll"><table id="arb-table"></table></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Closest to arbitrage</h2>
+        <p>Best fully guaranteed baskets by net edge per basket, in cents after fees. Above zero is an arbitrage; below zero is how far prices must move. Needs-review baskets are left out.</p>
+      </div>
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" data-view="chart" aria-pressed="true">Chart</button>
+        <button type="button" data-view="table" aria-pressed="false">Table</button>
+      </div>
+    </div>
+    <div class="chart-box" id="near-chart"></div>
+    <div class="scroll" id="near-table-wrap" hidden><table id="near-table"></table></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Bucket-set pricing</h2>
+        <p>Mutually exclusive events. A fair set sums to $1.00. YES asks summing under $1 or YES bids summing over $1 signal arbitrage.</p>
+      </div>
+      <div class="filters"><input type="search" id="me-search" placeholder="Filter events" aria-label="Filter events"></div>
+    </div>
+    <div class="scroll tall"><table id="me-table"></table></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>How opportunities are found</h2></div>
+    <dl class="method">
+      <dt>Buy every NO (bucket set)</dt>
+      <dd>In a mutually exclusive event at most one outcome resolves YES, so k NO contracts always pay at least $(k−1). It's an arbitrage when the NO asks sum to less than that. This needs only mutual exclusivity, so it's the most robust signal.</dd>
+      <dt>Buy every YES (bucket set)</dt>
+      <dd>If exactly one outcome must happen, one YES from every outcome pays exactly $1. It's an arbitrage when the YES asks sum to less than $1. This is only safe when the listed outcomes are exhaustive. That is verified automatically when the strike ranges cover the whole number line; otherwise the basket is tagged <span class="badge warn">⚠ verify exhaustive</span> and you must read the rules (e.g. a "which quarter does the recession start" set has no "no recession" leg).</dd>
+      <dt>Strike-ladder inversion</dt>
+      <dd>For threshold ladders like "Fed rate above 3.00% / above 3.25%", a higher strike can never be more likely than a lower one. Buying YES on the lower strike and NO on the higher strike pays at least $1 in every outcome. It's an arbitrage when the higher strike's YES bid is above the lower strike's YES ask.</dd>
+      <dt>Costs &amp; sizing</dt>
+      <dd>Prices are top-of-book asks (a NO ask is $1 − YES bid). Each leg pays Kalshi's taker fee, ceil(0.07 × multiplier × contracts × P × (1−P)) to the cent, using each series' fee multiplier. Size is capped by the thinnest leg's top-level depth. Payouts arrive at settlement, so annualized return uses the latest expiration in the basket.</dd>
+      <dt>Caveats</dt>
+      <dd>Quotes can move between legs, books are only read at the top level, and some events settle on rules that differ from their titles. Treat this as a screen, not an execution signal. Confirm the rules and live book before trading.</dd>
+    </dl>
+  </section>
+
+  <footer id="footer">Data: Kalshi public market-data API. Not investment advice.</footer>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const state = { data: null, mode: "api", sort: { arb: ["net_profit", -1], near: ["net_edge", -1], me: ["volume_24h", -1] }, view: "chart" };
+  const REVIEW_FLAGS = new Set(["verify_exhaustive", "inactive_outcomes"]);
+  const FLAG_TEXT = {
+    verify_exhaustive: ["warn", "⚠ verify exhaustive"],
+    inactive_outcomes: ["warn", "⚠ inactive outcome"],
+    no_depth: ["muted", "no depth"],
+  };
+  const STRAT_SHORT = { me_all_no: "All NO", me_all_yes: "All YES", ladder: "Ladder" };
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const usd = (v, d = 2) => (v < 0 ? "−$" : "$") + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  const cents = (v) => { const c = v * 100; return (c < 0 ? "−" : c > 0 ? "+" : "") + Math.abs(c).toFixed(1) + "¢"; };
+  const pct = (v) => v == null ? "—" : v > 10 ? "&gt;1,000%" : (v * 100).toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) < 0.1 ? 2 : 1 }) + "%";
+  const date = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }) : "—";
+  const ago = (iso) => { const s = (Date.now() - new Date(iso)) / 1000; return s < 90 ? Math.round(s) + "s ago" : s < 5400 ? Math.round(s / 60) + "m ago" : Math.round(s / 3600) + "h ago"; };
+  const needsReview = (o) => o.flags.some((f) => REVIEW_FLAGS.has(f));
+  const flagBadges = (o) => o.flags.map((f) => FLAG_TEXT[f] ? `<span class="badge ${FLAG_TEXT[f][0]}">${FLAG_TEXT[f][1]}</span>` : "").join("") || `<span class="badge ok">✓ guaranteed</span>`;
+  const eventCell = (o) => `<a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.event_title || o.event_ticker)}</a><div class="tick">${esc(o.event_ticker)}</div>`;
+  const legsCell = (o) => {
+    const legs = o.legs.slice(0, 6).map((l) => `<div><span class="side">${l.side.toUpperCase()}</span>${esc(l.label)} @ ${(l.price * 100).toFixed(0)}¢ <span class="tick">×${Math.floor(l.size).toLocaleString()}</span></div>`).join("");
+    return legs + (o.legs.length > 6 ? `<div class="tick">+ ${o.legs.length - 6} more legs</div>` : "");
+  };
+
+  // --- sortable table helper ---------------------------------------------
+  function renderTable(el, key, cols, rows, emptyHtml) {
+    const [sk, dir] = state.sort[key];
+    const col = cols.find((c) => c.key === sk) || cols[0];
+    const val = col.sortVal || ((r) => r[col.key]);
+    rows = [...rows].sort((a, b) => {
+      const x = val(a), y = val(b);
+      if (x == null) return 1; if (y == null) return -1;
+      return (x > y ? 1 : x < y ? -1 : 0) * dir;
+    });
+    const head = cols.map((c) => `<th data-key="${c.key}" class="${c.num ? "num" : ""}" ${c.key === sk ? `aria-sort="${dir > 0 ? "ascending" : "descending"}"` : ""} scope="col">${c.label}</th>`).join("");
+    const body = rows.length
+      ? rows.map((r) => `<tr>${cols.map((c) => `<td class="${c.cls || ""} ${c.num ? "num" : ""}">${c.render(r)}</td>`).join("")}</tr>`).join("")
+      : `<tr><td colspan="${cols.length}">${emptyHtml}</td></tr>`;
+    el.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
+    el.querySelectorAll("th").forEach((th) => th.addEventListener("click", () => {
+      const k = th.dataset.key;
+      state.sort[key] = [k, state.sort[key][0] === k ? -state.sort[key][1] : -1];
+      render();
+    }));
+  }
+
+  const oppCols = [
+    { key: "event_title", label: "Event", cls: "event", render: eventCell },
+    { key: "strategy", label: "Strategy", render: (o) => STRAT_SHORT[o.strategy] },
+    { key: "legs", label: "Legs to buy", cls: "legs", render: legsCell, sortVal: (o) => o.legs.length },
+    { key: "cost", label: "Cost", num: true, render: (o) => usd(o.cost) },
+    { key: "guaranteed_payout", label: "Min payout", num: true, render: (o) => usd(o.guaranteed_payout) },
+    { key: "net_edge", label: "Net edge / basket", num: true, render: (o) => `<span class="${o.net_edge > 0 ? "pos" : "neg"}">${cents(o.net_edge)}</span>` },
+    { key: "max_baskets", label: "Max baskets", num: true, render: (o) => o.max_baskets.toLocaleString() },
+    { key: "net_profit", label: "Net profit", num: true, render: (o) => `<span class="${o.net_profit > 0 ? "pos" : "neg"}">${usd(o.net_profit)}</span>` },
+    { key: "roi", label: "Return", num: true, render: (o) => pct(o.roi) },
+    { key: "annualized_roi", label: "Annualized", num: true, render: (o) => pct(o.annualized_roi) },
+    { key: "close_time", label: "Settles", render: (o) => date(o.close_time) },
+    { key: "flags", label: "Status", render: flagBadges, sortVal: (o) => needsReview(o) ? 1 : 0 },
+  ];
+
+  function filteredOpps(arbOnly) {
+    const d = state.data; if (!d) return [];
+    const strat = $("#f-strategy").value, q = $("#f-search").value.trim().toLowerCase(), showRev = $("#f-unverified").checked;
+    return d.opportunities.filter((o) =>
+      (!arbOnly || o.is_arb) && (!strat || o.strategy === strat) && (!arbOnly || showRev || !needsReview(o)) &&
+      (!q || (o.event_title + " " + o.event_ticker + " " + o.legs.map((l) => l.ticker).join(" ")).toLowerCase().includes(q)));
+  }
+
+  function renderKpis() {
+    const d = state.data, k = $("#kpis");
+    if (!d) { k.innerHTML = ""; return; }
+    const arbs = d.opportunities.filter((o) => o.is_arb);
+    const sure = arbs.filter((o) => !needsReview(o));
+    const review = arbs.length - sure.length;
+    const best = d.opportunities.filter((o) => !needsReview(o) && o.max_baskets > 0)[0];
+    const total = sure.reduce((s, o) => s + o.net_profit, 0);
+    const tiles = [
+      ["Guaranteed arbitrages", sure.length.toLocaleString(), review ? `${review} more need rule review` : "after taker fees"],
+      ["Capturable profit", usd(total), "at top-of-book depth"],
+      ["Best net edge", best ? cents(best.net_edge) : "—", best ? `per basket · ${STRAT_SHORT[best.strategy]} · ${best.event_ticker}` : ""],
+      ["Baskets evaluated", d.opportunities.length.toLocaleString(), `${d.events_scanned.toLocaleString()} events`],
+      ["Markets scanned", d.markets_scanned.toLocaleString(), `${d.series_with_open_events} live series of ${d.series_scanned}`],
+    ];
+    k.innerHTML = tiles.map(([l, v, n]) => `<div class="tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${esc(n)}</div></div>`).join("");
+  }
+
+  function renderArbs() {
+    const rows = filteredOpps(true);
+    const total = state.data ? state.data.opportunities.length : 0;
+    renderTable($("#arb-table"), "arb", oppCols, rows,
+      `<div class="empty"><strong>No arbitrage right now</strong>${total ? `All ${total.toLocaleString()} candidate baskets cost at least their guaranteed payout after fees. The closest ones are in the next panel.` : "Waiting for the first scan…"}</div>`);
+  }
+
+  // --- near-miss chart: horizontal bars of net edge (¢), zero baseline -----
+  function nearRows() {
+    return filteredOpps(false).filter((o) => o.max_baskets > 0 && !needsReview(o)).sort((a, b) => b.net_edge - a.net_edge).slice(0, 15);
+  }
+
+  function renderNearChart() {
+    const box = $("#near-chart"), rows = nearRows();
+    if (!rows.length) { box.innerHTML = `<div class="empty">No candidates match the filters.</div>`; return; }
+    const W = Math.max(box.clientWidth - 32, 300), narrow = W < 560;
+    const labelW = narrow ? 0 : Math.min(300, W * 0.38), rowH = narrow ? 44 : 28, top = 8, bottom = 26;
+    const plotL = labelW + 8, plotR = W - 56, H = top + rows.length * rowH + bottom;
+    const vals = rows.map((r) => r.net_edge * 100);
+    let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+    if (hi - lo < 1) { lo = Math.min(lo, -1); hi = Math.max(hi, 0.5); }
+    const pad = (hi - lo) * 0.05; lo -= lo < 0 ? pad : 0; hi += hi > 0 ? pad : 0;
+    const x = (v) => plotL + (v - lo) / (hi - lo) * (plotR - plotL);
+    const ticks = niceTicks(lo, hi, narrow ? 4 : 6);
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Net edge per basket for the ${rows.length} closest candidates">`;
+    ticks.forEach((t) => { s += `<line x1="${x(t)}" x2="${x(t)}" y1="${top}" y2="${H - bottom}" stroke="var(--grid)" stroke-width="1"/><text x="${x(t)}" y="${H - 8}" text-anchor="middle">${t > 0 ? "+" : ""}${+t.toFixed(2)}¢</text>`; });
+    s += `<line x1="${x(0)}" x2="${x(0)}" y1="${top}" y2="${H - bottom}" stroke="var(--text-muted)" stroke-width="1.5"/>`;
+    rows.forEach((r, i) => {
+      const v = r.net_edge * 100, yb = top + i * rowH, barH = narrow ? 12 : 14, by = yb + (narrow ? 22 : (rowH - barH) / 2);
+      const x0 = x(Math.min(0, v)), x1 = x(Math.max(0, v)), w = Math.max(x1 - x0, 2);
+      const fill = r.is_arb && !needsReview(r) ? "var(--good)" : "var(--series-1)";
+      const name = `${STRAT_SHORT[r.strategy]} · ${r.event_title || r.event_ticker}`;
+      if (narrow) s += `<text class="bar-label" x="${plotL}" y="${yb + 14}">${esc(trunc(name, 48))}</text>`;
+      else s += `<text class="bar-label" x="${labelW}" y="${by + barH / 2 + 4}" text-anchor="end">${esc(trunc(name, 44))}</text>`;
+      s += `<rect x="${x0}" y="${by}" width="${w}" height="${barH}" rx="3" fill="${fill}"/>`;
+      s += `<text x="${v < 0 ? x0 - 4 : x1 + 4}" y="${by + barH / 2 + 4}" text-anchor="${v < 0 ? "end" : "start"}" style="fill:var(--text-primary)">${cents(r.net_edge)}</text>`;
+      s += `<rect class="hit" data-i="${i}" x="0" y="${yb}" width="${W}" height="${rowH}" fill="transparent"/>`;
+    });
+    box.innerHTML = s + "</svg>";
+    const tip = $("#tooltip");
+    box.querySelectorAll(".hit").forEach((h) => {
+      h.addEventListener("mousemove", (e) => {
+        const r = rows[+h.dataset.i];
+        tip.innerHTML = `<b>${esc(r.event_title || r.event_ticker)}</b>${STRAT_SHORT[r.strategy]} · ${r.legs.length} legs<br>Cost ${usd(r.cost)} → pays ≥ ${usd(r.guaranteed_payout)}<br>Before fees ${cents(r.gross_edge)}, after fees ${cents(r.net_edge)} / basket<br>Depth ${r.max_baskets.toLocaleString()} baskets · settles ${date(r.close_time)}`;
+        tip.style.display = "block";
+        const tx = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+        tip.style.left = tx + window.scrollX + "px"; tip.style.top = e.clientY + window.scrollY + 14 + "px";
+        h.setAttribute("fill", "rgba(127,127,127,.08)");
+      });
+      h.addEventListener("mouseleave", () => { tip.style.display = "none"; h.setAttribute("fill", "transparent"); });
+    });
+  }
+
+  function niceTicks(lo, hi, n) {
+    const raw = (hi - lo) / n, mag = 10 ** Math.floor(Math.log10(raw)), step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+    const out = []; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(Math.abs(t) < 1e-9 ? 0 : t);
+    return out;
+  }
+  const trunc = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
+
+  function renderNearTable() {
+    renderTable($("#near-table"), "near", oppCols.filter((c) => !["roi", "annualized_roi"].includes(c.key)),
+      nearRows(), `<div class="empty">No candidates match the filters.</div>`);
+  }
+
+  function renderMe() {
+    const d = state.data; if (!d) return;
+    const q = $("#me-search").value.trim().toLowerCase();
+    const rows = d.mutually_exclusive_events.filter((e) => !q || (e.title + " " + e.event_ticker).toLowerCase().includes(q));
+    const cols = [
+      { key: "title", label: "Event", cls: "event", render: (e) => `<a href="https://kalshi.com/markets/${esc(e.series_ticker.toLowerCase())}" target="_blank" rel="noopener">${esc(e.title)}</a><div class="tick">${esc(e.event_ticker)}</div>` },
+      { key: "outcomes", label: "Outcomes", num: true, render: (e) => e.outcomes },
+      { key: "sum_yes_ask", label: "Σ YES ask", num: true, render: (e) => e.sum_yes_ask == null ? `<span class="tick">missing ask</span>` : `<span class="${e.sum_yes_ask < 1 ? "pos" : ""}">${usd(e.sum_yes_ask)}</span>` },
+      { key: "sum_yes_bid", label: "Σ YES bid", num: true, render: (e) => `<span class="${e.sum_yes_bid > 1 ? "pos" : ""}">${usd(e.sum_yes_bid)}</span>` },
+      { key: "spread", label: "Book width", num: true, sortVal: (e) => e.sum_yes_ask == null ? null : e.sum_yes_ask - e.sum_yes_bid, render: (e) => e.sum_yes_ask == null ? "—" : cents(e.sum_yes_ask - e.sum_yes_bid).replace("+", "") },
+      { key: "exhaustive", label: "Coverage", render: (e) => e.exhaustive ? `<span class="badge ok">✓ strikes cover all</span>` : `<span class="badge muted">check rules</span>` },
+      { key: "volume_24h", label: "24h volume", num: true, render: (e) => Math.round(e.volume_24h).toLocaleString() },
+    ];
+    renderTable($("#me-table"), "me", cols, rows, `<div class="empty">No mutually exclusive events.</div>`);
+  }
+
+  function renderStatus(s) {
+    const st = $("#status"), btn = $("#refresh");
+    if (state.mode === "file") { st.innerHTML = `<span class="dot"></span>Saved snapshot · ${state.data ? new Date(state.data.generated_at).toLocaleString() : ""}`; btn.hidden = true; return; }
+    if (s.scanning) {
+      const p = s.progress; st.innerHTML = `<span class="dot busy"></span>Scanning ${p.total ? `${p.done}/${p.total} series` : "series list"}…` + (state.data ? ` · showing scan from ${ago(state.data.generated_at)}` : "");
+      btn.disabled = true;
+    } else if (state.data) {
+      st.innerHTML = `<span class="dot live"></span>Updated ${ago(state.data.generated_at)} · ${state.data.scan_seconds}s scan` + (s.next_scan_in != null ? ` · next in ${Math.ceil(s.next_scan_in / 60)}m` : "");
+      btn.disabled = false;
+    }
+    const err = $("#error");
+    const msgs = [s.last_error && `Last scan failed: ${s.last_error}`, state.data && state.data.errors.length && `${state.data.errors.length} series could not be fetched in the last scan.`].filter(Boolean);
+    err.style.display = msgs.length ? "block" : "none"; err.textContent = msgs.join(" ");
+  }
+
+  function render() {
+    renderKpis(); renderArbs(); renderMe();
+    if (state.view === "chart") renderNearChart(); else renderNearTable();
+    if (state.data) $("#footer").textContent = `Data: Kalshi public market-data API, category “${state.data.category}”, generated ${new Date(state.data.generated_at).toLocaleString()}. Not investment advice.`;
+  }
+
+  let lastGen = null;
+  async function poll() {
+    let delay = 15000;
+    try {
+      if (state.mode === "api") {
+        const r = await fetch("api/state", { cache: "no-store" });
+        if (!r.ok) throw new Error(r.status);
+        const s = await r.json();
+        if (s.snapshot && s.snapshot.generated_at !== lastGen) { state.data = s.snapshot; lastGen = s.snapshot.generated_at; render(); }
+        renderStatus(s);
+        delay = s.scanning ? 2000 : 15000;
+      }
+    } catch (e) {
+      // No server: fall back to a static snapshot file (?data=… or snapshot.json).
+      const src = new URLSearchParams(location.search).get("data") || "snapshot.json";
+      try {
+        const r = await fetch(src, { cache: "no-store" });
+        if (!r.ok) throw new Error(r.status);
+        state.data = await r.json(); state.mode = "file"; render(); renderStatus({});
+        return;
+      } catch (_) {
+        $("#status").innerHTML = `<span class="dot"></span>No data source`;
+        const err = $("#error"); err.style.display = "block";
+        err.textContent = "Couldn't reach the scanner. Start it with: python -m kalshi_arb serve";
+        delay = 5000;
+      }
+    }
+    setTimeout(poll, delay);
+  }
+
+  ["#f-strategy", "#f-unverified", "#f-search"].forEach((s) => $(s).addEventListener("input", render));
+  $("#me-search").addEventListener("input", renderMe);
+  document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+    state.view = b.dataset.view;
+    document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    $("#near-chart").hidden = state.view !== "chart"; $("#near-table-wrap").hidden = state.view !== "table";
+    render();
+  }));
+  $("#refresh").addEventListener("click", async () => {
+    $("#refresh").disabled = true;
+    try { await fetch("api/refresh", { method: "POST" }); } catch (_) {}
+    setTimeout(poll, 500);
+  });
+  let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => state.view === "chart" && renderNearChart(), 150); });
+  poll();
+})();
+</script>
+</body>
+</html>
