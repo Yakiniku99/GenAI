@@ -9,7 +9,9 @@ request count.
 from __future__ import annotations
 
 import json
+import shutil
 import threading
+import webbrowser
 import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,6 +21,7 @@ from .client import KalshiClient
 from .scanner import scan
 
 STATIC = Path(__file__).parent / "static"
+DEMO_SNAPSHOT = Path(__file__).parent / "demo_snapshot.json"
 FULL_SCAN_EVERY = 10  # cycles
 
 
@@ -31,10 +34,12 @@ class State:
         self.last_error: str | None = None
         self.next_scan_at: float | None = None
         self.refresh_now = threading.Event()
+        self.static = False  # serving a saved snapshot, no rescans
 
     def public(self) -> dict:
         with self.lock:
             return {
+                "static": self.static,
                 "scanning": self.scanning,
                 "progress": {"done": self.progress[0], "total": self.progress[1]},
                 "last_error": self.last_error,
@@ -58,7 +63,7 @@ def _scan_loop(state: State, args) -> None:
                 state.progress = (done, total)
 
         try:
-            snap = scan(client, args.category, only, args.workers, progress, args.fees)
+            snap = scan(client, args.category, only, args.workers, progress, args.fees, args.depth)
             snap["full_discovery"] = full
             active = sorted({o["series_ticker"] for o in snap["opportunities"]}
                             | set(snap["series_titles"]))
@@ -113,11 +118,24 @@ def serve(args) -> None:
     if args.snapshot:
         with open(args.snapshot) as f:
             state.snapshot = json.load(f)
+        state.static = True
     else:
         threading.Thread(target=_scan_loop, args=(state, args), daemon=True).start()
     httpd = ThreadingHTTPServer((args.host, args.port), make_handler(state))
-    print(f"Kalshi arbitrage dashboard on http://{args.host}:{args.port}  (Ctrl+C to stop)")
+    url = f"http://{args.host}:{args.port}/"
+    mode = f"snapshot {args.snapshot}" if args.snapshot else "live scanning"
+    print(f"Kalshi arbitrage dashboard ({mode}) on {url}  (Ctrl+C to stop)")
+    if getattr(args, "open", False):
+        threading.Timer(0.5, webbrowser.open, args=(url,)).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
+
+
+def build_static_site(snapshot: dict, out_dir: str) -> None:
+    """Write index.html + snapshot.json: a self-contained static dashboard."""
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    shutil.copy(STATIC / "index.html", out / "index.html")
+    (out / "snapshot.json").write_text(json.dumps(snapshot))

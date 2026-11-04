@@ -126,6 +126,8 @@ class Quote:
     status: str
     close_time: str | None
     volume_24h: float
+    open_interest: float = 0.0
+    volume: float = 0.0
 
     @classmethod
     def from_market(cls, m: dict) -> "Quote":
@@ -142,7 +144,16 @@ class Quote:
             status=m.get("status", ""),
             close_time=m.get("expected_expiration_time") or m.get("close_time"),
             volume_24h=_f(m.get("volume_24h_fp")),
+            open_interest=_f(m.get("open_interest_fp")),
+            volume=_f(m.get("volume_fp")),
         )
+
+    @property
+    def spread(self) -> float | None:
+        """YES bid-ask spread in dollars (same for NO); None if one side is empty."""
+        if self.yes_bid_size > 0 and self.yes_ask_size > 0:
+            return round(self.yes_ask - self.yes_bid, 4)
+        return None
 
     @property
     def active(self) -> bool:
@@ -167,7 +178,104 @@ class Leg:
     label: str
     side: str
     price: float
-    size: float
+    size: float                       # contracts at the best ask
+    spread: float | None = None       # bid-ask spread, dollars
+    volume_24h: float = 0.0           # contracts traded in the last 24h
+    open_interest: float = 0.0        # contracts outstanding
+    depth_5c: float | None = None     # contracts offered within 5c of best ask (order book)
+
+    @classmethod
+    def from_quote(cls, q: "Quote", side: str) -> "Leg":
+        return cls(q.ticker, q.label, side, q.ask(side), q.depth(side),
+                   q.spread, q.volume_24h, q.open_interest)
+
+
+# Liquidity tiers for a basket: the widest leg spread and the dollars you can
+# put to work at the best prices. 24h volume and open interest are reported
+# alongside but don't set the tier: a resting book is fillable even on a day
+# nobody traded.
+LIQUIDITY_TIERS = (  # (tier, max spread in dollars, min top-of-book depth in dollars)
+    ("high", 0.02, 1000),
+    ("medium", 0.05, 100),
+    ("low", 0.10, 10),
+)
+
+
+def liquidity_summary(legs: list[Leg], cost: float, max_baskets: int) -> dict:
+    spreads = [l.spread for l in legs]
+    worst_spread = None if any(s is None for s in spreads) else max(spreads)
+    depth_usd = round(cost * max_baskets, 2)
+    tier = "thin"
+    if worst_spread is not None:
+        for name, max_spread, min_depth in LIQUIDITY_TIERS:
+            if worst_spread <= max_spread + EPS and depth_usd >= min_depth:
+                tier = name
+                break
+    return {
+        "tier": tier,
+        "max_spread": worst_spread,
+        "top_depth_usd": depth_usd,
+        "min_volume_24h": round(min(l.volume_24h for l in legs), 2),
+        "min_open_interest": round(min(l.open_interest for l in legs), 2),
+        "book": None,  # filled by walk_book() for top candidates
+    }
+
+
+Level = tuple[float, float]  # (price to buy at, contracts)
+
+
+def asks_from_orderbook(book: dict, side: str) -> list[Level]:
+    """Kalshi books list resting *bids* for each side. Buying YES fills
+    against NO bids at 1 - p, and vice versa. Returns asks, best first."""
+    ob = book.get("orderbook_fp") or {}
+    opposite = ob.get("no_dollars" if side == "yes" else "yes_dollars") or []
+    levels = [(round(1 - _f(p), 4), _f(q)) for p, q in opposite if _f(q) > 0]
+    return sorted(levels)
+
+
+def walk_book(ladders: list[list[Level]], payout: float, fee_fn: FeeFn) -> dict:
+    """Buy baskets level by level while each extra chunk is still profitable
+    after fees. Returns fillable baskets and profit at full depth."""
+    idx = [0] * len(ladders)
+    left = [lad[0][1] if lad else 0.0 for lad in ladders]
+    baskets = cost = fees = 0.0
+    worst_cost = None
+    while all(i < len(l) for i, l in zip(idx, ladders)):
+        q = int(min(left) + EPS)
+        prices = [l[i][0] for i, l in zip(idx, ladders)]
+        if q >= 1:
+            chunk_cost = sum(prices) * q
+            chunk_fees = sum(fee_fn(p, q) for p in prices)
+            if payout * q - chunk_cost - chunk_fees <= EPS:
+                break
+            baskets += q
+            cost += chunk_cost
+            fees += chunk_fees
+            worst_cost = sum(prices)
+        step = min(left)
+        for k in range(len(ladders)):
+            left[k] -= step
+            if left[k] <= EPS:
+                idx[k] += 1
+                if idx[k] < len(ladders[k]):
+                    left[k] = ladders[k][idx[k]][1]
+        if q < 1 and step <= EPS:
+            break
+    profit = payout * baskets - cost - fees
+    return {
+        "baskets": int(baskets),
+        "capital": round(cost + fees, 2),
+        "fees": round(fees, 2),
+        "profit": round(profit, 2),
+        "worst_basket_cost": round(worst_cost, 4) if worst_cost is not None else None,
+    }
+
+
+def depth_within(levels: list[Level], width: float = 0.05) -> float:
+    if not levels:
+        return 0.0
+    best = levels[0][0]
+    return round(sum(q for p, q in levels if p <= best + width + EPS), 2)
 
 
 @dataclass
@@ -189,6 +297,7 @@ class Opportunity:
     days_to_close: float | None
     close_time: str | None
     flags: list[str] = field(default_factory=list)
+    liquidity: dict = field(default_factory=dict)
 
     @property
     def is_arb(self) -> bool:
@@ -222,7 +331,7 @@ def price_basket(
     now: datetime,
     flags: Iterable[str] = (),
 ) -> Opportunity:
-    legs = [Leg(q.ticker, q.label, s, q.ask(s), q.depth(s)) for q, s in zip(quotes, sides)]
+    legs = [Leg.from_quote(q, s) for q, s in zip(quotes, sides)]
     cost = round(sum(l.price for l in legs), 4)
     max_baskets = int(min(l.size for l in legs) + EPS)
     n = max(max_baskets, 1)
@@ -256,6 +365,7 @@ def price_basket(
         days_to_close=round(days, 2) if days is not None else None,
         close_time=close,
         flags=flags,
+        liquidity=liquidity_summary(legs, cost, max_baskets),
     )
 
 

@@ -93,6 +93,9 @@ class KalshiClient:
     def series(self, category: str) -> list[dict]:
         return self.get("/series", {"category": category}).get("series") or []
 
+    def orderbook(self, ticker: str) -> dict:
+        return self.get(f"/markets/{urllib.parse.quote(ticker)}/orderbook")
+
     def open_events_with_markets(self, series_ticker: str) -> list[dict]:
         return list(self.paginate(
             "/events", "events",

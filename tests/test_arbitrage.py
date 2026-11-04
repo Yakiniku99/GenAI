@@ -1,8 +1,9 @@
 import unittest
 from datetime import datetime, timezone
 
-from kalshi_arb.arbitrage import (FEE_MODELS, Quote, analyze_event, analyze_events, robinhood_fee,
-                                  strike_coverage_is_exhaustive, taker_fee)
+from kalshi_arb.arbitrage import (FEE_MODELS, Quote, analyze_event, analyze_events, asks_from_orderbook,
+                                  depth_within, robinhood_fee, strike_coverage_is_exhaustive, taker_fee,
+                                  walk_book)
 
 KALSHI = FEE_MODELS["kalshi"].for_series()
 
@@ -148,6 +149,42 @@ class CoverageTests(unittest.TestCase):
     def test_missing_tail_is_not_exhaustive(self):
         qs = [self.q("between", 2.0, 2.3), self.q("greater", floor=2.4)]
         self.assertFalse(strike_coverage_is_exhaustive(qs))
+
+
+class LiquidityTests(unittest.TestCase):
+    def test_orderbook_bids_become_asks(self):
+        book = {"orderbook_fp": {"yes_dollars": [["0.30", "10"], ["0.40", "5"]],
+                                 "no_dollars": [["0.55", "7"], ["0.58", "3"]]}}
+        # Buying YES hits NO bids: best NO bid 0.58 -> YES ask 0.42
+        self.assertEqual(asks_from_orderbook(book, "yes"), [(0.42, 3.0), (0.45, 7.0)])
+        self.assertEqual(asks_from_orderbook(book, "no"), [(0.60, 5.0), (0.70, 10.0)])
+        self.assertEqual(depth_within(asks_from_orderbook(book, "no"), 0.05), 5.0)
+
+    def test_walk_book_stops_when_unprofitable(self):
+        free = lambda p, c: 0.0
+        # basket payout $1: level costs 0.80, then 0.95, then 1.05
+        a = [(0.40, 10), (0.45, 10), (0.50, 10)]
+        b = [(0.40, 10), (0.50, 10), (0.55, 10)]
+        r = walk_book([a, b], 1.0, free)
+        self.assertEqual(r["baskets"], 20)
+        self.assertAlmostEqual(r["profit"], 10 * 0.20 + 10 * 0.05)
+        self.assertAlmostEqual(r["worst_basket_cost"], 0.95)
+
+    def test_walk_book_uneven_levels(self):
+        free = lambda p, c: 0.0
+        r = walk_book([[(0.30, 5), (0.35, 20)], [(0.40, 12)]], 1.0, free)
+        self.assertEqual(r["baskets"], 12)
+        self.assertAlmostEqual(r["profit"], 5 * 0.30 + 7 * 0.25)
+
+    def test_liquidity_tier_and_leg_fields(self):
+        ev = event([mkt("A", 0.40, 0.41, bid_size=5000), mkt("B", 0.40, 0.41, bid_size=5000)])
+        no = [o for o in analyze_event(ev, now=NOW) if o.strategy == "me_all_no"][0]
+        self.assertAlmostEqual(no.legs[0].spread, 0.01)
+        # 5,000 baskets x $1.20 = $6,000 at a 1c spread
+        self.assertEqual(no.liquidity["tier"], "high")
+        thin = event([mkt("A", 0.30, 0.45, bid_size=5), mkt("B", 0.30, 0.45, bid_size=5)])
+        no = [o for o in analyze_event(thin, now=NOW) if o.strategy == "me_all_no"][0]
+        self.assertEqual(no.liquidity["tier"], "thin")
 
 
 if __name__ == "__main__":

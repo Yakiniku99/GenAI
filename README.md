@@ -8,10 +8,46 @@ what they cost to buy right now, after trading fees. **Fees default to Robinhood
 Pure Python standard library, so there's nothing to `pip install` (Python 3.10+). It uses only Kalshi's public
 market-data API, so no account or API key is needed.
 
+## Run the demo
+
+There are three ways to run it, from quickest to most live:
+
+| | Command | What you get |
+|---|---|---|
+| **1. Instant demo** | `python -m kalshi_arb demo` | Opens the dashboard in your browser on bundled sample data from a real full scan. No network needed, starts in about a second. |
+| **2. Live, on your machine** | `python -m kalshi_arb serve --open` | Scans Kalshi live (first full scan takes ~3 min), then rescans every 3 min. |
+| **3. Hosted link** | GitHub Pages (below) | A public URL that rebuilds from live Kalshi data every 30 minutes. Good for sharing. |
+
 ```bash
-python -m kalshi_arb serve                         # Robinhood fees, open http://127.0.0.1:8000
-python -m kalshi_arb serve --fees robinhood-gold    # if you have Robinhood Gold
+git clone https://github.com/Yakiniku99/GenAI.git && cd GenAI
+python -m kalshi_arb demo
 ```
+
+Faster live demo: watch a handful of popular series so scans take seconds:
+
+```bash
+python -m kalshi_arb serve --open --series KXFED KXFEDDECISION KXCPIYOY KXPAYROLLS KXRATECUTCOUNT
+```
+
+With Docker:
+
+```bash
+docker build -t kalshi-arb . && docker run --rm -p 8000:8000 kalshi-arb
+```
+
+### Hosted on GitHub Pages
+
+`.github/workflows/pages.yml` runs the tests, does a live scan, and publishes `index.html` +
+`snapshot.json` as a static site on every push and every 30 minutes.
+
+1. In the repo, open **Settings → Pages** and set **Source** to **GitHub Actions**.
+2. Open **Actions → Publish dashboard → Run workflow**, or just push.
+3. The site appears at `https://<user>.github.io/<repo>/`.
+
+Scheduled runs only fire on the repo's default branch. To build the same static site locally, run
+`python -m kalshi_arb build --out _site`.
+
+Fees default to Robinhood without Gold. Add `--fees robinhood-gold` or `--fees kalshi` to any command.
 
 ## What it detects
 
@@ -50,6 +86,11 @@ looks like an 80¢ arbitrage but has no "no recession" outcome.
   and sort any column.
 * **Closest to arbitrage**: the 15 best fully guaranteed baskets by net edge, as a chart or a table. This
   shows how far prices need to move, which is useful because real arbitrage on Kalshi is rare and short-lived.
+* **Liquidity**: every leg shows its bid-ask spread, 24h volume and open interest. Each basket
+  gets a tier (High ≤ 2¢ spread & ≥ $1,000 at best prices; Medium ≤ 5¢ & ≥ $100; Low ≤ 10¢ & ≥ $10;
+  otherwise Thin) and can be filtered by it. For the 40 best candidates (`--depth N`), the full
+  order book is read to show contracts within 5¢ of the best price and a **full-book fill**: how many
+  baskets can be bought down the book while each one stays profitable after fees.
 * **Bucket-set pricing**: Σ YES ask / Σ YES bid for each mutually exclusive event, with book width
   and whether strikes cover every outcome.
 

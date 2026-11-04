@@ -1,4 +1,5 @@
 __pycache__/
 *.pyc
-snapshot*.json
 .venv/
+_site/
+snapshot*.json

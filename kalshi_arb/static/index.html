@@ -96,6 +96,9 @@ td.event a:hover { text-decoration: underline; }
 .badge.ok { background: var(--good-bg); color: var(--good-ink); }
 .badge.warn { background: var(--warning-bg); color: var(--warning-ink); }
 .badge.muted { background: var(--surface-2); color: var(--text-secondary); }
+.badge.info { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); }
+.liq { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.liq-meta { display: block; font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin: 0 0 3px 30px; }
 .empty { padding: 28px 16px; text-align: center; color: var(--text-secondary); }
 .empty strong { display: block; color: var(--text-primary); font-size: 15px; margin-bottom: 4px; }
 .chart-box { padding: 12px 16px 16px; position: relative; }
@@ -148,6 +151,12 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
           <option value="me_all_yes">Buy every YES</option>
           <option value="ladder">Strike-ladder inversion</option>
         </select>
+        <select id="f-liquidity" aria-label="Minimum liquidity">
+          <option value="">Any liquidity</option>
+          <option value="low">Low or better</option>
+          <option value="medium">Medium or better</option>
+          <option value="high">High only</option>
+        </select>
         <label><input type="checkbox" id="f-unverified" checked> Show needs-review</label>
         <input type="search" id="f-search" placeholder="Filter by event or ticker" aria-label="Search">
       </div>
@@ -192,6 +201,8 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       <dd>For threshold ladders like "Fed rate above 3.00% / above 3.25%", a higher strike can never be more likely than a lower one. Buying YES on the lower strike and NO on the higher strike pays at least $1 in every outcome. It's an arbitrage when the higher strike's YES bid is above the lower strike's YES ask.</dd>
       <dt>Costs &amp; sizing</dt>
       <dd>Prices are top-of-book asks (a NO ask is $1 − YES bid). Each leg is one order and pays the fees of the selected venue, currently <strong id="fee-desc">—</strong>. Choose the venue when starting the server with <code>--fees robinhood | robinhood-gold | kalshi</code>. Fees are charged when you buy; holding to settlement adds no closing trade. Size is capped by the thinnest leg's top-level depth. Payouts arrive at settlement, so annualized return uses the latest expiration in the basket.</dd>
+      <dt>Liquidity</dt>
+      <dd>Each leg shows its bid-ask spread, contracts traded in the last 24 hours, and open interest. For the top candidates it also shows contracts offered within 5¢ of the best price. A basket's tier comes from its widest spread and the dollars you can deploy at the best prices: <strong>High</strong> ≤ 2¢ and ≥ $1,000, <strong>Medium</strong> ≤ 5¢ and ≥ $100, <strong>Low</strong> ≤ 10¢ and ≥ $10, otherwise <strong>Thin</strong>. <em>Full-book fill</em> reads each leg's full order book and buys basket after basket down the book while each one is still profitable after fees, which shows how much of an arbitrage is really capturable.</dd>
       <dt>Trading through Robinhood</dt>
       <dd>Robinhood charges a commission of k × P × (1−P) per contract, rounded up to the cent and capped at 1¢ per contract (k = 10%, or 5% with Gold). It also passes through Kalshi's exchange fee of 1¢ per contract per side. Kalshi's own taker fee doesn't apply on top. Every leg costs at least 1¢ per contract, so baskets with many cheap legs are hit hardest. Robinhood doesn't list every Kalshi market; check that each leg is tradable there before relying on a basket.</dd>
       <dt>Caveats</dt>
@@ -221,11 +232,28 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   const pct = (v) => v == null ? "—" : v > 10 ? "&gt;1,000%" : (v * 100).toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) < 0.1 ? 2 : 1 }) + "%";
   const date = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }) : "—";
   const ago = (iso) => { const s = (Date.now() - new Date(iso)) / 1000; return s < 90 ? Math.round(s) + "s ago" : s < 5400 ? Math.round(s / 60) + "m ago" : Math.round(s / 3600) + "h ago"; };
+  const compact = (v) => v == null ? "—" : v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? (v / 1e3).toFixed(v >= 1e4 ? 0 : 1) + "k" : Math.round(v).toLocaleString();
+  const TIER_RANK = { thin: 0, low: 1, medium: 2, high: 3 };
+  const TIER_BADGE = { high: ["ok", "●●● High"], medium: ["info", "●●○ Medium"], low: ["muted", "●○○ Low"], thin: ["warn", "○○○ Thin"] };
+  const liqOf = (o) => o.liquidity || { tier: "thin", top_depth_usd: 0, max_spread: null, book: null };
+  const liquidityCell = (o) => {
+    const L = liqOf(o), [cls, txt] = TIER_BADGE[L.tier];
+    return `<span class="badge ${cls}" title="Tier from the widest leg spread and dollars available at the best prices">${txt}</span>` +
+      `<div class="liq">${usd(L.top_depth_usd, 0)} at best · spread ≤ ${L.max_spread == null ? "—" : (L.max_spread * 100).toFixed(1) + "¢"}</div>` +
+      `<div class="liq">24h vol ≥ ${compact(L.min_volume_24h)} · OI ≥ ${compact(L.min_open_interest)}</div>`;
+  };
+  const bookCell = (o) => {
+    const b = liqOf(o).book;
+    if (!b) return `<span class="tick" title="Full order book is read for the top candidates only">not read</span>`;
+    if (!b.baskets) return `<span class="neg">0 profitable</span>`;
+    return `<span class="pos">${b.baskets.toLocaleString()} baskets</span><div class="liq">${usd(b.profit)} on ${usd(b.capital, 0)}</div>`;
+  };
   const needsReview = (o) => o.flags.some((f) => REVIEW_FLAGS.has(f));
   const flagBadges = (o) => o.flags.map((f) => FLAG_TEXT[f] ? `<span class="badge ${FLAG_TEXT[f][0]}">${FLAG_TEXT[f][1]}</span>` : "").join("") || `<span class="badge ok">✓ guaranteed</span>`;
   const eventCell = (o) => `<a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.event_title || o.event_ticker)}</a><div class="tick">${esc(o.event_ticker)}</div>`;
   const legsCell = (o) => {
-    const legs = o.legs.slice(0, 6).map((l) => `<div><span class="side">${l.side.toUpperCase()}</span>${esc(l.label)} @ ${(l.price * 100).toFixed(0)}¢ <span class="tick">×${Math.floor(l.size).toLocaleString()}</span></div>`).join("");
+    const legs = o.legs.slice(0, 6).map((l) => `<div><span class="side">${l.side.toUpperCase()}</span>${esc(l.label)} @ ${(l.price * 100).toFixed(0)}¢ <span class="tick">×${Math.floor(l.size).toLocaleString()}</span></div>` +
+      `<span class="liq-meta" title="Bid-ask spread · contracts traded in 24h · open interest${l.depth_5c != null ? " · contracts offered within 5¢ of best price" : ""}">spread ${l.spread == null ? "—" : (l.spread * 100).toFixed(1) + "¢"} · vol ${compact(l.volume_24h)} · OI ${compact(l.open_interest)}${l.depth_5c != null ? ` · ${compact(l.depth_5c)} within 5¢` : ""}</span>`).join("");
     return legs + (o.legs.length > 6 ? `<div class="tick">+ ${o.legs.length - 6} more legs</div>` : "");
   };
 
@@ -259,6 +287,8 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     { key: "guaranteed_payout", label: "Min payout", num: true, render: (o) => usd(o.guaranteed_payout) },
     { key: "net_edge", label: "Net edge / basket", num: true, render: (o) => `<span class="${o.net_edge > 0 ? "pos" : "neg"}">${cents(o.net_edge)}</span>` },
     { key: "max_baskets", label: "Max baskets", num: true, render: (o) => o.max_baskets.toLocaleString() },
+    { key: "liquidity", label: "Liquidity", render: liquidityCell, sortVal: (o) => TIER_RANK[liqOf(o).tier] * 1e9 + liqOf(o).top_depth_usd },
+    { key: "book", label: "Full-book fill", num: true, render: bookCell, sortVal: (o) => liqOf(o).book ? liqOf(o).book.profit : null },
     { key: "net_profit", label: "Net profit", num: true, render: (o) => `<span class="${o.net_profit > 0 ? "pos" : "neg"}">${usd(o.net_profit)}</span>` },
     { key: "roi", label: "Return", num: true, render: (o) => pct(o.roi) },
     { key: "annualized_roi", label: "Annualized", num: true, render: (o) => pct(o.annualized_roi) },
@@ -269,7 +299,9 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   function filteredOpps(arbOnly) {
     const d = state.data; if (!d) return [];
     const strat = $("#f-strategy").value, q = $("#f-search").value.trim().toLowerCase(), showRev = $("#f-unverified").checked;
+    const minTier = $("#f-liquidity").value;
     return d.opportunities.filter((o) =>
+      (!minTier || TIER_RANK[liqOf(o).tier] >= TIER_RANK[minTier]) &&
       (!arbOnly || o.is_arb) && (!strat || o.strategy === strat) && (!arbOnly || showRev || !needsReview(o)) &&
       (!q || (o.event_title + " " + o.event_ticker + " " + o.legs.map((l) => l.ticker).join(" ")).toLowerCase().includes(q)));
   }
@@ -337,7 +369,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     box.querySelectorAll(".hit").forEach((h) => {
       h.addEventListener("mousemove", (e) => {
         const r = rows[+h.dataset.i];
-        tip.innerHTML = `<b>${esc(r.event_title || r.event_ticker)}</b>${STRAT_SHORT[r.strategy]} · ${r.legs.length} legs<br>Cost ${usd(r.cost)} → pays ≥ ${usd(r.guaranteed_payout)}<br>Before fees ${cents(r.gross_edge)}, after fees ${cents(r.net_edge)} / basket<br>Depth ${r.max_baskets.toLocaleString()} baskets · settles ${date(r.close_time)}`;
+        tip.innerHTML = `<b>${esc(r.event_title || r.event_ticker)}</b>${STRAT_SHORT[r.strategy]} · ${r.legs.length} legs<br>Cost ${usd(r.cost)} → pays ≥ ${usd(r.guaranteed_payout)}<br>Before fees ${cents(r.gross_edge)}, after fees ${cents(r.net_edge)} / basket<br>Depth ${r.max_baskets.toLocaleString()} baskets (${usd(liqOf(r).top_depth_usd, 0)}) · ${TIER_BADGE[liqOf(r).tier][1].split(" ")[1]} liquidity<br>Settles ${date(r.close_time)}`;
         tip.style.display = "block";
         const tx = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
         tip.style.left = tx + window.scrollX + "px"; tip.style.top = e.clientY + window.scrollY + 14 + "px";
@@ -377,8 +409,11 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
 
   function renderStatus(s) {
     const st = $("#status"), btn = $("#refresh");
-    if (state.mode === "file") { st.innerHTML = `<span class="dot"></span>Saved snapshot · ${state.data ? new Date(state.data.generated_at).toLocaleString() : ""}`; btn.hidden = true; return; }
-    if (s.scanning) {
+    if (state.mode === "file" || s.static) {
+      st.innerHTML = `<span class="dot"></span>Snapshot from ${state.data ? `${ago(state.data.generated_at)} (${new Date(state.data.generated_at).toLocaleString()})` : "—"}`;
+      btn.hidden = true;
+      if (state.mode !== "file") return;
+    } else if (s.scanning) {
       const p = s.progress; st.innerHTML = `<span class="dot busy"></span>Scanning ${p.total ? `${p.done}/${p.total} series` : "series list"}…` + (state.data ? ` · showing scan from ${ago(state.data.generated_at)}` : "");
       btn.disabled = true;
     } else if (state.data) {
@@ -405,13 +440,14 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   async function poll() {
     let delay = 15000;
     try {
+      if (state.mode === "file") throw new Error("static");
       if (state.mode === "api") {
         const r = await fetch("api/state", { cache: "no-store" });
         if (!r.ok) throw new Error(r.status);
         const s = await r.json();
         if (s.snapshot && s.snapshot.generated_at !== lastGen) { state.data = s.snapshot; lastGen = s.snapshot.generated_at; render(); }
         renderStatus(s);
-        delay = s.scanning ? 2000 : 15000;
+        delay = s.static ? 60000 : s.scanning ? 2000 : 15000;
       }
     } catch (e) {
       // No server: fall back to a static snapshot file (?data=… or snapshot.json).
@@ -419,7 +455,10 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       try {
         const r = await fetch(src, { cache: "no-store" });
         if (!r.ok) throw new Error(r.status);
-        state.data = await r.json(); state.mode = "file"; render(); renderStatus({});
+        const snap = await r.json();
+        if (snap.generated_at !== lastGen) { state.data = snap; lastGen = snap.generated_at; render(); }
+        state.mode = "file"; renderStatus({});
+        setTimeout(poll, 300000);  // static hosting (e.g. GitHub Pages): pick up rebuilt snapshots
         return;
       } catch (_) {
         $("#status").innerHTML = `<span class="dot"></span>No data source`;
@@ -431,7 +470,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     setTimeout(poll, delay);
   }
 
-  ["#f-strategy", "#f-unverified", "#f-search"].forEach((s) => $(s).addEventListener("input", render));
+  ["#f-strategy", "#f-liquidity", "#f-unverified", "#f-search"].forEach((s) => $(s).addEventListener("input", render));
   $("#me-search").addEventListener("input", renderMe);
   document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
     state.view = b.dataset.view;

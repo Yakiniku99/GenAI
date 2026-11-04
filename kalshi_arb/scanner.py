@@ -7,7 +7,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Callable
 
-from .arbitrage import DEFAULT_FEE_MODEL, FEE_MODELS, Quote, analyze_events, strike_coverage_is_exhaustive
+from .arbitrage import (DEFAULT_FEE_MODEL, FEE_MODELS, Opportunity, Quote, analyze_events,
+                        asks_from_orderbook, depth_within, strike_coverage_is_exhaustive, walk_book)
 from .client import KalshiClient
 
 ProgressFn = Callable[[int, int], None]
@@ -35,6 +36,37 @@ def _event_summary(ev: dict) -> dict | None:
     }
 
 
+def add_book_depth(client: KalshiClient, opps: list[Opportunity], fee_model: str,
+                   fee_mult: dict[str, float], limit: int, workers: int) -> list[str]:
+    """Read full order books for the best `limit` candidates (plus every
+    arbitrage) and record how many baskets can be filled profitably."""
+    if limit <= 0:
+        return []
+    ranked = [o for o in opps if o.max_baskets >= 1]
+    chosen = [o for o in ranked if o.is_arb]
+    chosen += [o for o in ranked if not o.is_arb][:max(limit - len(chosen), 0)]
+    tickers = sorted({l.ticker for o in chosen for l in o.legs})
+    books: dict[str, dict] = {}
+    errors: list[str] = []
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(client.orderbook, t): t for t in tickers}
+        for fut in as_completed(futures):
+            try:
+                books[futures[fut]] = fut.result()
+            except Exception as e:
+                errors.append(f"orderbook {futures[fut]}: {e}")
+    model = FEE_MODELS[fee_model]
+    for o in chosen:
+        if any(l.ticker not in books for l in o.legs):
+            continue
+        ladders = [asks_from_orderbook(books[l.ticker], l.side) for l in o.legs]
+        for leg, lad in zip(o.legs, ladders):
+            leg.depth_5c = depth_within(lad)
+        o.liquidity["book"] = walk_book(ladders, o.guaranteed_payout,
+                                        model.for_series(fee_mult.get(o.series_ticker, 1.0)))
+    return errors
+
+
 def scan(
     client: KalshiClient | None = None,
     category: str = "Economics",
@@ -42,6 +74,7 @@ def scan(
     workers: int = 10,
     progress: ProgressFn | None = None,
     fee_model: str = DEFAULT_FEE_MODEL,
+    depth_candidates: int = 40,
 ) -> dict:
     client = client or KalshiClient()
     started = time.time()
@@ -68,6 +101,8 @@ def scan(
 
     now = datetime.now(timezone.utc)
     opps = analyze_events(events, fee_mult, now, fee_model)
+    book_errors = add_book_depth(client, opps, fee_model, fee_mult, depth_candidates, workers)
+    errors += book_errors
     summaries = [s for s in (_event_summary(e) for e in events) if s]
     n_markets = sum(len(e.get("markets") or []) for e in events)
     return {
@@ -81,6 +116,7 @@ def scan(
         "events_scanned": len(events),
         "markets_scanned": n_markets,
         "series_titles": {k: v for k, v in titles.items() if any(e.get("series_ticker") == k for e in events)},
+        "depth_candidates": depth_candidates,
         "opportunities": [o.to_dict() for o in opps],
         "mutually_exclusive_events": sorted(summaries, key=lambda s: -(s["volume_24h"] or 0)),
         "errors": errors,
