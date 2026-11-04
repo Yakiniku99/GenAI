@@ -1,7 +1,10 @@
 import unittest
 from datetime import datetime, timezone
 
-from kalshi_arb.arbitrage import analyze_event, strike_coverage_is_exhaustive, taker_fee, Quote
+from kalshi_arb.arbitrage import (FEE_MODELS, Quote, analyze_event, analyze_events, robinhood_fee,
+                                  strike_coverage_is_exhaustive, taker_fee)
+
+KALSHI = FEE_MODELS["kalshi"].for_series()
 
 NOW = datetime(2026, 11, 1, tzinfo=timezone.utc)
 
@@ -28,6 +31,35 @@ class FeeTests(unittest.TestCase):
         self.assertEqual(taker_fee(0.50, 100, 0), 0.0)
 
 
+class RobinhoodFeeTests(unittest.TestCase):
+    """Figures from Robinhood's event-contract fee table (100 contracts)."""
+
+    def test_commission_table_plus_exchange_fee(self):
+        # fee = commission + $0.01/contract exchange fee ($1.00 on 100)
+        cases = [  # price, gold commission, non-gold commission
+            (0.01, 0.05, 0.10), (0.05, 0.24, 0.48), (0.10, 0.45, 0.90),
+            (0.15, 0.64, 1.00), (0.50, 1.00, 1.00), (0.90, 0.45, 0.90), (0.99, 0.05, 0.10),
+        ]
+        for p, gold, std in cases:
+            with self.subTest(price=p):
+                self.assertAlmostEqual(robinhood_fee(p, 100, gold=True), gold + 1.00)
+                self.assertAlmostEqual(robinhood_fee(p, 100, gold=False), std + 1.00)
+
+    def test_worked_example(self):
+        # 100 YES at $0.90 with Gold costs $91.45 all-in.
+        self.assertAlmostEqual(90 + robinhood_fee(0.90, 100, gold=True), 91.45)
+
+    def test_single_contract_rounds_up(self):
+        self.assertAlmostEqual(robinhood_fee(0.50, 1), 0.02)  # 1c commission + 1c exchange
+
+    def test_default_model_is_robinhood_and_ignores_kalshi_multiplier(self):
+        ev = event([mkt("A", 0.40, 0.45), mkt("B", 0.40, 0.45), mkt("C", 0.40, 0.45)])
+        rh = [o for o in analyze_events([ev], {"SER": 0.0}, NOW) if o.strategy == "me_all_no"][0]
+        kx = [o for o in analyze_events([ev], {"SER": 0.0}, NOW, "kalshi") if o.strategy == "me_all_no"][0]
+        self.assertAlmostEqual(kx.fees, 0.0)       # fee-free series on Kalshi direct
+        self.assertAlmostEqual(rh.fees, 3 * 2.00)  # 3 legs x (1.00 commission + 1.00 exchange)
+
+
 class BucketTests(unittest.TestCase):
     def test_all_yes_arbitrage_on_exhaustive_ladder(self):
         ev = event([
@@ -35,7 +67,7 @@ class BucketTests(unittest.TestCase):
             mkt("MID", 0.28, 0.30, strike_type="between", floor=2.0, cap=2.4),
             mkt("HIGH", 0.28, 0.30, strike_type="greater", floor=2.4),
         ])
-        opps = {o.strategy: o for o in analyze_event(ev, now=NOW)}
+        opps = {o.strategy: o for o in analyze_event(ev, KALSHI, now=NOW)}
         yes = opps["me_all_yes"]
         self.assertAlmostEqual(yes.cost, 0.90)
         self.assertEqual(yes.max_baskets, 100)

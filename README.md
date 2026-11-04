@@ -2,13 +2,15 @@
 
 A live dashboard that scans every open **Economics** market on [Kalshi](https://kalshi.com)
 and flags baskets of contracts whose *guaranteed* settlement payout is worth more than
-what they cost to buy right now, after Kalshi's taker fees.
+what they cost to buy right now, after trading fees. **Fees default to Robinhood's schedule**
+(for trading Kalshi contracts through Robinhood); Robinhood Gold and Kalshi-direct are also available.
 
 Pure Python standard library, so there's nothing to `pip install` (Python 3.10+). It uses only Kalshi's public
 market-data API, so no account or API key is needed.
 
 ```bash
-python -m kalshi_arb serve          # open http://127.0.0.1:8000
+python -m kalshi_arb serve                         # Robinhood fees, open http://127.0.0.1:8000
+python -m kalshi_arb serve --fees robinhood-gold    # if you have Robinhood Gold
 ```
 
 ## What it detects
@@ -20,8 +22,19 @@ python -m kalshi_arb serve          # open http://127.0.0.1:8000
 | **Strike-ladder inversion** | Threshold ladders in one event ("above 3.00%", "above 3.25%" …) | YES on the easier strike + NO on the harder one | ≥ $1 | YES bid (harder) > YES ask (easier) |
 
 Every basket is costed at the top of the book (a NO ask is $1 − YES bid, with YES-bid depth).
-Each leg pays the Kalshi taker fee `ceil_to_cent(0.07 × fee_multiplier × contracts × P × (1−P))`,
-using each series' own fee multiplier. Size is capped by the thinnest leg's top-level depth.
+Size is capped by the thinnest leg's top-level depth. Each leg is one order and pays the fees of
+the venue you pick with `--fees`:
+
+| `--fees` | Per-order fee | Source |
+|---|---|---|
+| `robinhood` (default) | `min(ceil_to_cent(0.10 × P × (1−P) × C), $0.01 × C)` commission **+ $0.01 × C** Kalshi exchange fee | Robinhood event-contract fee schedule (effective June 1, 2026) |
+| `robinhood-gold` | same, with 0.05 instead of 0.10 | 〃 |
+| `kalshi` | `ceil_to_cent(0.07 × series_multiplier × C × P × (1−P))` | Kalshi fee schedule |
+
+Fees are charged on the buy; holding to settlement involves no closing trade. On Robinhood every
+leg costs at least 1¢ per contract, so a 2-leg ladder needs about 3–4¢ of mispricing to break even
+and a 6-leg bucket set more than 6¢. Robinhood doesn't list every Kalshi market, so check each leg is
+tradable there. Fee schedules change, so check Robinhood's current schedule before trading.
 
 **"Buy every YES" is only risk-free if the listed outcomes are exhaustive.** The scanner verifies
 this automatically when strike ranges chain from an open-ended low bucket to an open-ended high bucket

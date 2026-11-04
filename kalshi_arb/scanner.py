@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Callable
 
-from .arbitrage import analyze_events, strike_coverage_is_exhaustive, Quote
+from .arbitrage import DEFAULT_FEE_MODEL, FEE_MODELS, Quote, analyze_events, strike_coverage_is_exhaustive
 from .client import KalshiClient
 
 ProgressFn = Callable[[int, int], None]
@@ -41,6 +41,7 @@ def scan(
     series_filter: list[str] | None = None,
     workers: int = 10,
     progress: ProgressFn | None = None,
+    fee_model: str = DEFAULT_FEE_MODEL,
 ) -> dict:
     client = client or KalshiClient()
     started = time.time()
@@ -66,13 +67,15 @@ def scan(
                 progress(done, len(series))
 
     now = datetime.now(timezone.utc)
-    opps = analyze_events(events, fee_mult, now)
+    opps = analyze_events(events, fee_mult, now, fee_model)
     summaries = [s for s in (_event_summary(e) for e in events) if s]
     n_markets = sum(len(e.get("markets") or []) for e in events)
     return {
         "generated_at": now.isoformat(),
         "scan_seconds": round(time.time() - started, 1),
         "category": category,
+        "fee_model": {"key": fee_model, "label": FEE_MODELS[fee_model].label,
+                      "description": FEE_MODELS[fee_model].description},
         "series_scanned": len(series),
         "series_with_open_events": len({e.get("series_ticker") for e in events}),
         "events_scanned": len(events),

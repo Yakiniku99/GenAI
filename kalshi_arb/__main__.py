@@ -11,6 +11,7 @@ import argparse
 import json
 import sys
 
+from .arbitrage import DEFAULT_FEE_MODEL, FEE_MODELS
 from .client import KalshiClient
 from .scanner import scan
 
@@ -30,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     common.add_argument("--series", nargs="*", help="Only scan these series tickers, e.g. KXFED KXCPI")
     common.add_argument("--rate", type=float, default=12.0, help="Max API requests per second (default: 12)")
     common.add_argument("--workers", type=int, default=10)
+    common.add_argument("--fees", choices=sorted(FEE_MODELS), default=DEFAULT_FEE_MODEL,
+                        help="Fee schedule to net out: robinhood (default, no Gold), robinhood-gold, or kalshi (direct)")
 
     s = sub.add_parser("scan", parents=[common], help="Scan once and print or save the results")
     s.add_argument("-o", "--out", help="Write the snapshot JSON here instead of printing a summary")
@@ -43,14 +46,15 @@ def main(argv: list[str] | None = None) -> int:
     a = p.parse_args(argv)
 
     if a.cmd == "scan":
-        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress)
+        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees)
         if a.out:
             with open(a.out, "w") as f:
                 json.dump(snap, f, indent=1)
             print(f"wrote {a.out}", file=sys.stderr)
         arbs = [o for o in snap["opportunities"] if o["is_arb"]]
         print(f"{snap['markets_scanned']} markets in {snap['events_scanned']} events "
-              f"({snap['scan_seconds']}s); {len(arbs)} arbitrage opportunities")
+              f"({snap['scan_seconds']}s); {len(arbs)} arbitrage opportunities "
+              f"after {snap['fee_model']['label']} fees")
         for o in arbs[:20]:
             legs = " + ".join(f"{l['side'].upper()} {l['ticker']} @{l['price']:.2f}" for l in o["legs"])
             print(f"  ${o['net_edge']:.3f}/basket x{o['max_baskets']} = ${o['net_profit']:.2f}  "

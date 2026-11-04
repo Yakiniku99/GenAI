@@ -123,7 +123,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   <header>
     <div>
       <h1>Kalshi Economics Arbitrage</h1>
-      <p class="sub">Baskets of contracts whose guaranteed payout is worth more than their cost to buy right now, after taker fees.</p>
+      <p class="sub">Baskets of contracts whose guaranteed payout is worth more than their cost to buy right now, after <span id="fee-label">trading fees</span>.</p>
     </div>
     <div class="status">
       <span id="status"><span class="dot"></span>Connecting…</span>
@@ -191,7 +191,9 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       <dt>Strike-ladder inversion</dt>
       <dd>For threshold ladders like "Fed rate above 3.00% / above 3.25%", a higher strike can never be more likely than a lower one. Buying YES on the lower strike and NO on the higher strike pays at least $1 in every outcome. It's an arbitrage when the higher strike's YES bid is above the lower strike's YES ask.</dd>
       <dt>Costs &amp; sizing</dt>
-      <dd>Prices are top-of-book asks (a NO ask is $1 − YES bid). Each leg pays Kalshi's taker fee, ceil(0.07 × multiplier × contracts × P × (1−P)) to the cent, using each series' fee multiplier. Size is capped by the thinnest leg's top-level depth. Payouts arrive at settlement, so annualized return uses the latest expiration in the basket.</dd>
+      <dd>Prices are top-of-book asks (a NO ask is $1 − YES bid). Each leg is one order and pays the fees of the selected venue, currently <strong id="fee-desc">—</strong>. Choose the venue when starting the server with <code>--fees robinhood | robinhood-gold | kalshi</code>. Fees are charged when you buy; holding to settlement adds no closing trade. Size is capped by the thinnest leg's top-level depth. Payouts arrive at settlement, so annualized return uses the latest expiration in the basket.</dd>
+      <dt>Trading through Robinhood</dt>
+      <dd>Robinhood charges a commission of k × P × (1−P) per contract, rounded up to the cent and capped at 1¢ per contract (k = 10%, or 5% with Gold). It also passes through Kalshi's exchange fee of 1¢ per contract per side. Kalshi's own taker fee doesn't apply on top. Every leg costs at least 1¢ per contract, so baskets with many cheap legs are hit hardest. Robinhood doesn't list every Kalshi market; check that each leg is tradable there before relying on a basket.</dd>
       <dt>Caveats</dt>
       <dd>Quotes can move between legs, books are only read at the top level, and some events settle on rules that differ from their titles. Treat this as a screen, not an execution signal. Confirm the rules and live book before trading.</dd>
     </dl>
@@ -272,6 +274,8 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       (!q || (o.event_title + " " + o.event_ticker + " " + o.legs.map((l) => l.ticker).join(" ")).toLowerCase().includes(q)));
   }
 
+  const feeLabel = () => (state.data && state.data.fee_model ? state.data.fee_model.label : "Kalshi direct");
+
   function renderKpis() {
     const d = state.data, k = $("#kpis");
     if (!d) { k.innerHTML = ""; return; }
@@ -281,7 +285,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     const best = d.opportunities.filter((o) => !needsReview(o) && o.max_baskets > 0)[0];
     const total = sure.reduce((s, o) => s + o.net_profit, 0);
     const tiles = [
-      ["Guaranteed arbitrages", sure.length.toLocaleString(), review ? `${review} more need rule review` : "after taker fees"],
+      ["Guaranteed arbitrages", sure.length.toLocaleString(), review ? `${review} more need rule review` : `after ${feeLabel()} fees`],
       ["Capturable profit", usd(total), "at top-of-book depth"],
       ["Best net edge", best ? cents(best.net_edge) : "—", best ? `per basket · ${STRAT_SHORT[best.strategy]} · ${best.event_ticker}` : ""],
       ["Baskets evaluated", d.opportunities.length.toLocaleString(), `${d.events_scanned.toLocaleString()} events`],
@@ -389,7 +393,12 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   function render() {
     renderKpis(); renderArbs(); renderMe();
     if (state.view === "chart") renderNearChart(); else renderNearTable();
-    if (state.data) $("#footer").textContent = `Data: Kalshi public market-data API, category “${state.data.category}”, generated ${new Date(state.data.generated_at).toLocaleString()}. Not investment advice.`;
+    if (state.data) {
+      const fm = state.data.fee_model || { label: "Kalshi direct", description: "7% × P × (1−P) taker fee × series multiplier, per order" };
+      $("#fee-label").textContent = `${fm.label} fees`;
+      $("#fee-desc").textContent = `${fm.label}: ${fm.description}`;
+      $("#footer").textContent = `Data: Kalshi public market-data API, category “${state.data.category}”, generated ${new Date(state.data.generated_at).toLocaleString()}. Fees: ${fm.label}. Not investment advice.`;
+    }
   }
 
   let lastGen = null;

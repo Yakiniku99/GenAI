@@ -2,7 +2,8 @@
 
 Every strategy here builds a basket of contracts whose *minimum* payout at
 settlement is known in advance, then compares it to what the basket costs to
-buy right now at the top of the book (plus Kalshi taker fees).
+buy right now at the top of the book, plus trading fees for the chosen
+venue (Kalshi direct, or Robinhood with or without Gold; see FEE_MODELS).
 
 Strategies
 ----------
@@ -30,7 +31,7 @@ import math
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from itertools import combinations
-from typing import Iterable
+from typing import Callable, Iterable
 
 TAKER_FEE_RATE = 0.07
 EPS = 1e-9
@@ -52,13 +53,63 @@ def _f(v, default: float = 0.0) -> float:
         return default
 
 
+def _ceil_cent(x: float) -> float:
+    # round() guards against float noise pushing e.g. 0.0700000001 up a cent
+    return math.ceil(round(x * 100, 6)) / 100
+
+
 def taker_fee(price: float, count: int, multiplier: float = 1.0) -> float:
     """Kalshi taker fee for one order: ceil_to_cent(0.07 * m * C * P * (1-P))."""
     if count <= 0 or multiplier <= 0:
         return 0.0
-    raw = TAKER_FEE_RATE * multiplier * count * price * (1 - price)
-    # round() guards against float noise pushing e.g. 0.0700000001 up a cent
-    return math.ceil(round(raw * 100, 6)) / 100
+    return _ceil_cent(TAKER_FEE_RATE * multiplier * count * price * (1 - price))
+
+
+# Robinhood Derivatives fee schedule (effective June 1, 2026), for Kalshi
+# contracts traded through Robinhood:
+#   commission    = ceil_to_cent(k * P * (1-P) * C), capped at $0.01/contract
+#                   k = 0.05 with Robinhood Gold, 0.10 without
+#   exchange fee  = $0.01 per contract, per side (KalshiEx via Robinhood)
+# Kalshi's own taker fee and per-series multiplier do not apply on top.
+ROBINHOOD_EXCHANGE_FEE = 0.01
+ROBINHOOD_COMMISSION_CAP = 0.01
+
+
+def robinhood_fee(price: float, count: int, gold: bool = False) -> float:
+    if count <= 0:
+        return 0.0
+    k = 0.05 if gold else 0.10
+    commission = min(_ceil_cent(k * price * (1 - price) * count), ROBINHOOD_COMMISSION_CAP * count)
+    return round(commission + ROBINHOOD_EXCHANGE_FEE * count, 2)
+
+
+FeeFn = Callable[[float, int], float]  # (price, contracts) -> dollars for one order
+
+
+@dataclass(frozen=True)
+class FeeModel:
+    key: str
+    label: str
+    description: str
+
+    def for_series(self, kalshi_multiplier: float = 1.0) -> FeeFn:
+        if self.key == "kalshi":
+            return lambda p, c: taker_fee(p, c, kalshi_multiplier)
+        gold = self.key == "robinhood-gold"
+        return lambda p, c: robinhood_fee(p, c, gold)
+
+
+FEE_MODELS = {
+    m.key: m for m in (
+        FeeModel("robinhood", "Robinhood (no Gold)",
+                 "10% × P × (1−P) commission (max 1¢) + 1¢ Kalshi exchange fee, per contract per order"),
+        FeeModel("robinhood-gold", "Robinhood Gold",
+                 "5% × P × (1−P) commission (max 1¢) + 1¢ Kalshi exchange fee, per contract per order"),
+        FeeModel("kalshi", "Kalshi direct",
+                 "7% × P × (1−P) taker fee × series multiplier, per order"),
+    )
+}
+DEFAULT_FEE_MODEL = "robinhood"
 
 
 @dataclass
@@ -129,7 +180,7 @@ class Opportunity:
     guaranteed_payout: float  # per basket
     cost: float               # per basket, before fees
     max_baskets: int          # limited by top-of-book depth
-    fees: float               # total taker fees at max_baskets (or 1 if no depth)
+    fees: float               # total fees at max_baskets (or 1 if no depth)
     net_profit: float         # total, after fees, at max_baskets
     net_edge: float           # per basket, after fees
     gross_edge: float         # per basket, before fees
@@ -167,7 +218,7 @@ def price_basket(
     quotes: list[Quote],
     sides: list[str],
     payout: float,
-    fee_multiplier: float,
+    fee_fn: FeeFn,
     now: datetime,
     flags: Iterable[str] = (),
 ) -> Opportunity:
@@ -175,7 +226,7 @@ def price_basket(
     cost = round(sum(l.price for l in legs), 4)
     max_baskets = int(min(l.size for l in legs) + EPS)
     n = max(max_baskets, 1)
-    fees = round(sum(taker_fee(l.price, n, fee_multiplier) for l in legs), 2)
+    fees = round(sum(fee_fn(l.price, n) for l in legs), 2)
     net_profit = round((payout - cost) * n - fees, 4)
     capital = cost * n + fees
     close = max((q.close_time for q in quotes if q.close_time), default=None)
@@ -235,9 +286,10 @@ def strike_coverage_is_exhaustive(quotes: list[Quote]) -> bool:
     return all(abs(g - tick) <= 1e-6 for g in positive) and (not widths or tick <= min(widths) + EPS)
 
 
-def analyze_event(event: dict, fee_multiplier: float = 1.0, now: datetime | None = None) -> list[Opportunity]:
+def analyze_event(event: dict, fee_fn: FeeFn | None = None, now: datetime | None = None) -> list[Opportunity]:
     """Return every candidate basket for one event (profitable or not)."""
     now = now or datetime.now(timezone.utc)
+    fee_fn = fee_fn or FEE_MODELS[DEFAULT_FEE_MODEL].for_series()
     all_quotes = [Quote.from_market(m) for m in event.get("markets") or []]
     quotes = [q for q in all_quotes if q.active]
     out: list[Opportunity] = []
@@ -253,12 +305,12 @@ def analyze_event(event: dict, fee_multiplier: float = 1.0, now: datetime | None
             if not strike_coverage_is_exhaustive(quotes):
                 flags.append("verify_exhaustive")
             out.append(price_basket("me_all_yes", event, quotes, ["yes"] * len(quotes),
-                                    1.0, fee_multiplier, now, flags))
+                                    1.0, fee_fn, now, flags))
         # Buy every NO: k legs pay >= k-1 whenever at most one resolves YES.
         no_legs = [q for q in quotes if q.can_buy("no")]
         if len(no_legs) >= 2:
             out.append(price_basket("me_all_no", event, no_legs, ["no"] * len(no_legs),
-                                    float(len(no_legs) - 1), fee_multiplier, now))
+                                    float(len(no_legs) - 1), fee_fn, now))
         return out
 
     # Ladders: same event, same strike direction, distinct strikes.
@@ -276,7 +328,7 @@ def analyze_event(event: dict, fee_multiplier: float = 1.0, now: datetime | None
             if not (yes_q.can_buy("yes") and no_q.can_buy("no")):
                 continue
             opp = price_basket("ladder", event, [yes_q, no_q], ["yes", "no"],
-                               1.0, fee_multiplier, now)
+                               1.0, fee_fn, now)
             if best is None or (opp.net_edge, opp.net_profit) > (best.net_edge, best.net_profit):
                 best = opp
         if best:
@@ -285,11 +337,15 @@ def analyze_event(event: dict, fee_multiplier: float = 1.0, now: datetime | None
 
 
 def analyze_events(events: list[dict], fee_multipliers: dict[str, float] | None = None,
-                   now: datetime | None = None) -> list[Opportunity]:
+                   now: datetime | None = None, fee_model: str = DEFAULT_FEE_MODEL) -> list[Opportunity]:
+    """fee_multipliers are Kalshi's per-series multipliers (only used by the
+    "kalshi" fee model)."""
     fee_multipliers = fee_multipliers or {}
+    model = FEE_MODELS[fee_model]
     now = now or datetime.now(timezone.utc)
     opps: list[Opportunity] = []
     for ev in events:
-        opps.extend(analyze_event(ev, fee_multipliers.get(ev.get("series_ticker", ""), 1.0), now))
+        fee_fn = model.for_series(fee_multipliers.get(ev.get("series_ticker", ""), 1.0))
+        opps.extend(analyze_event(ev, fee_fn, now))
     opps.sort(key=lambda o: (o.is_arb, o.net_edge, o.net_profit), reverse=True)
     return opps
