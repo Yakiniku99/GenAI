@@ -138,53 +138,54 @@ a.btn:hover { border-color: var(--accent); }
 .trades-mini { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); }
 .mover a.news { font-size: 12px; color: var(--accent); text-decoration: none; }
 .gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.indicators { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding: 16px; }
-.ind { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-1); }
-.ind .t { font-size: 12px; color: var(--text-secondary); }
-.ind .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 2px 0; }
-.ind .r { font-size: 12px; color: var(--text-secondary); }
-.ind svg { width: 100%; height: 54px; display: block; margin-top: 6px; }
-.ind svg.path { height: 86px; }
-.ind:hover, .ind:focus-within { border-color: var(--accent); }
-.ind .vrow { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.ind .chg { font-size: 13px; font-weight: 600; white-space: nowrap; }
-.ind .chg.flat { color: var(--text-muted); font-weight: 500; }
-.hist-wrap { margin-top: 8px; }
-.hist-cap, .pcap { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
-.pm-key { display: inline-block; width: 12px; border-top: 2px dashed var(--text-primary); margin-right: 4px; vertical-align: middle; }
-.dash-key { display: inline-block; width: 14px; border-top: 2px dashed var(--text-muted); margin-right: 4px; vertical-align: middle; }
-.hist { display: flex; align-items: stretch; gap: 2px; height: 104px; }
-.hist .col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: stretch; cursor: default; }
-.hist .pv { font-size: 9px; line-height: 12px; height: 12px; text-align: center; color: var(--text-secondary); font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .12s; }
-.hist .bar { flex: 1; position: relative; display: flex; align-items: flex-end; }
-.hist .bar i { display: block; width: 100%; min-height: 1px; background: var(--series-1); border-radius: 3px 3px 0 0; }
-.hist .pm { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed var(--text-primary); opacity: .75; }
-.hist .xl { height: 30px; font-size: 9px; color: var(--text-muted); writing-mode: vertical-rl; transform: rotate(180deg); text-align: right; align-self: center; white-space: nowrap; overflow: hidden; border-left: 1px solid var(--grid); padding-left: 1px; font-variant-numeric: tabular-nums; }
-.hist .col:hover .bar i { background: var(--accent); filter: brightness(1.15); }
-.hist .col:hover .xl { color: var(--text-primary); }
-.ind:hover .hist .pv, .ind:focus-within .hist .pv { opacity: 1; }
-.two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; align-items: end; }
-@media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
-.pathbox { margin-top: 8px; }
-.pathbox .plot { position: relative; height: 104px; border-bottom: 1px solid var(--grid); }
-.pathbox svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.pathbox .pdot { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--series-1); border: 2px solid var(--surface-1); box-sizing: content-box; cursor: default; }
-.pathbox .pdot::after { content: ""; position: absolute; inset: -8px; }
-.pathbox .plab { position: absolute; transform: translate(-50%, -150%); font-size: 10px; font-weight: 600; color: var(--text-primary); white-space: nowrap; opacity: 0; transition: opacity .12s; pointer-events: none; background: var(--surface-1); padding: 0 2px; border-radius: 3px; }
-.ind:hover .pathbox .plab, .ind:focus-within .pathbox .plab { opacity: 1; }
-.pathbox .paxis { position: relative; }
-.pathbox .pxl { position: absolute; top: 3px; transform: translateX(-50%); font-size: 9px; color: var(--text-muted); white-space: nowrap; }
-.pathbox .pxl.l, .pathbox .plab.l { transform: translateX(-4px); }
-.pathbox .pxl.r { transform: translateX(calc(-100% + 4px)); }
-.pathbox .plab.l { transform: translate(-4px, -150%); }
-.pathbox .plab.r { transform: translate(calc(-100% + 4px), -150%); }
-.pathbox .ptoday { position: absolute; top: 0; transform: translateX(3px); font-size: 9px; color: var(--text-muted); }
-.pathbox .paxis { height: 18px; }
+.indicators { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; padding: 16px; }
+.ind { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px 12px; background: var(--surface-1); min-height: 246px; }
+.ind:hover, .ind:focus-within { border-color: var(--accent); outline: none; }
+.ind-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.ind .t { font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--text-primary); }
+.ind .tags { display: flex; gap: 6px; flex: none; align-items: center; }
+.pill24 { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); white-space: nowrap; font-variant-numeric: tabular-nums; cursor: default; }
+.pill24.flat { color: var(--text-muted); font-weight: 500; }
+.tag-thin { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--warning-bg); color: var(--warning-ink); white-space: nowrap; cursor: default; }
 .ind .note2 { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.ind .pts { font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; margin-top: 4px; line-height: 1.5; }
-.ind .lab { font-size: 10px; fill: var(--text-muted); }
-.ind.has-path { grid-column: span 2; }
-@media (max-width: 640px) { .ind.has-path { grid-column: auto; } }
+.ind .v { font-size: 26px; font-weight: 700; line-height: 1.15; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.ind .sub, .ind .meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ind .meta { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ind .chart { margin-top: auto; padding-top: 10px; }
+.ind .chart-head { display: flex; justify-content: flex-end; height: 22px; margin-bottom: 2px; }
+.mini-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.mini-seg button { border: 0; border-radius: 0; padding: 1px 8px; font-size: 11px; background: var(--surface-1); color: var(--text-secondary); }
+.mini-seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--text-primary); font-weight: 600; }
+.ind[data-view="path"] .c-hist, .ind[data-view="hist"] .c-path { display: none; }
+.hist { display: flex; gap: 2px; height: 92px; }
+.hist .col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; position: relative; cursor: default; }
+.hist .pv { height: 13px; font-size: 9px; line-height: 13px; text-align: center; color: var(--text-secondary); font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .12s; }
+.ind:hover .hist .pv, .ind:focus-within .hist .pv { opacity: 1; }
+.hist .bar { flex: 1; position: relative; display: flex; align-items: flex-end; border-bottom: 1px solid var(--grid); }
+.hist .bar i { display: block; width: 100%; min-height: 1px; background: var(--series-1); border-radius: 3px 3px 0 0; }
+.hist .col:hover .bar i { filter: brightness(1.2); }
+.hist .pm { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed var(--text-primary); opacity: .7; }
+.hist .xl { position: relative; height: 16px; }
+.hist .xl span { position: absolute; top: 3px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hist .col:first-child .xl span { left: 0; transform: none; }
+.hist .col:last-child .xl span { left: auto; right: 0; transform: none; }
+.pathbox .plot { position: relative; height: 92px; border-bottom: 1px solid var(--grid); }
+.pathbox svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.pathbox .pdot { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--series-1); border: 2px solid var(--surface-1); box-sizing: content-box; cursor: default; }
+.pathbox .pdot::after { content: ""; position: absolute; inset: -9px; }
+.pathbox .plab { position: absolute; transform: translate(-50%, -165%); font-size: 10px; font-weight: 600; white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+.pathbox .plab.l { transform: translate(-3px, -165%); }
+.pathbox .plab.r { transform: translate(calc(-100% + 3px), -165%); }
+.pathbox .ptoday { position: absolute; bottom: 2px; transform: translateX(3px); font-size: 9px; color: var(--text-muted); }
+.pathbox .paxis { position: relative; height: 16px; }
+.pathbox .pxl { position: absolute; top: 3px; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.pathbox .pxl.l { transform: translateX(-3px); }
+.pathbox .pxl.r { transform: translateX(calc(-100% + 3px)); }
+.read-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--text-secondary); margin: 2px 0 0; }
+.read-key i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+.read-key .k-bar { width: 10px; height: 10px; border-radius: 2px; background: var(--series-1); }
+.read-key .k-prev { width: 14px; border-top: 2px dashed var(--text-primary); opacity: .7; }
+.read-key .k-band { width: 14px; height: 10px; background: var(--series-1); opacity: .25; border-radius: 2px; }
 .sec-title { font-size: 18px; margin: 26px 0 10px; scroll-margin-top: 12px; }
 .sec-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 4px; }
 .sec-nav a { font-size: 13px; text-decoration: none; color: var(--text-primary); border: 1px solid var(--border); background: var(--surface-1); border-radius: 999px; padding: 4px 12px; }
@@ -196,9 +197,6 @@ h3.grp + .indicators { padding-top: 10px; }
 .down { color: var(--critical); }
 .flat { color: var(--text-muted); }
 .note { font-size: 12px; color: var(--text-muted); padding: 0 16px 14px; }
-.research { padding: 4px 16px 16px; font-size: 13px; color: var(--text-secondary); }
-.research table { margin: 8px 0 12px; }
-.research th, .research td { padding: 6px 10px; }
 
 td.event { white-space: normal; min-width: 220px; max-width: 360px; }
 td.event a { color: var(--text-primary); text-decoration: none; font-weight: 500; }
@@ -382,15 +380,17 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       <div class="scroll tall"><table id="shark-table"></table></div>
     </section>
 
-    <section class="card">
-      <div class="card-head"><div><h2>Why these signals? The evidence</h2><p id="research-sub">From <code>python -m kalshi_arb research</code>.</p></div></div>
-      <div class="research" id="research"></div>
-    </section>
   </div>
 
   <div class="tab-panel" id="tab-macro" hidden>
     <section class="gauges" id="gauges" aria-label="Headline expectations"></section>
     <nav class="sec-nav" id="sec-nav" aria-label="Sections"></nav>
+    <div class="read-key" aria-label="How to read the cards">
+      <span><i class="k-bar"></i>Probability of each outcome at the next release</span>
+      <span><i class="k-prev"></i>Same, 24 hours ago</span>
+      <span><i class="k-band"></i>10–90% range on path charts</span>
+      <span>Hover over a card for exact values; tap on a phone</span>
+    </div>
     <h2 class="sec-title" id="sec-rates">Interest rates</h2>
     <section class="card">
       <div class="card-head">
@@ -404,7 +404,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     </section>
     <div class="indicators flat-grid" id="ind-rates"></div>
     <div id="macro-sections"></div>
-    <p class="note" style="padding:0">Hover over a card to see each bar's exact probability, and point at a bar or point for today vs 24 hours ago. On a phone, tap. How to read the cards: each Kalshi "above X" ladder is a probability distribution. Cards show its median, the 10–90% range and the change over 24 hours (comparing the same strikes). Strikes with spreads over 10¢ are ignored. Where Kalshi lists several releases or a year-end contract, the small chart shows the implied path over the next year, plotted by the period each contract measures. Most monthly series are only listed one to three releases ahead, so housing has no path yet. "Highest … this year" cards are distributions of the year's peak, not its level. CPI component cards are BLS index levels.</p>
+    <p class="note" style="padding:12px 0 0">Each Kalshi "above X" ladder is a probability distribution. The big number is its median, and the pill is the median's 24-hour change, measured on strikes that traded both now and then. Strikes with spreads over 10¢ are ignored. Path charts join the next releases with any year-end contract, plotted by the period each contract measures. Most monthly series are listed only one to three releases ahead. "Highest … this year" cards are the year's peak, not its level. CPI component cards are BLS index levels.</p>
   </div>
 
   <footer id="footer">Data: Kalshi public market-data API. Not investment advice.</footer>
@@ -727,23 +727,6 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     ];
     if (!state.sort.shark) state.sort.shark = ["ts", -1];
     renderTable($("#shark-table"), "shark", cols, sig.big_trades || [], `<div class="empty">No trades of ${(sig.shark_size || 1000).toLocaleString()}+ contracts in the last 24h.</div>`);
-    renderResearch(sig.model || {});
-  }
-
-  function renderResearch(model) {
-    const el = $("#research");
-    const v = model.validation || {}, mk = model.markouts_cents || [];
-    if (!mk.length) { el.innerHTML = "Run <code>python -m kalshi_arb research</code> to generate the evidence."; return; }
-    const mkRows = mk.map((r) => `<tr><td>${esc(r.bucket)}</td><td class="num">${r.n.toLocaleString()}</td><td class="num">${signC(r["1h"], 2)}¢</td><td class="num">${signC(r["24h"], 2)}¢</td></tr>`).join("");
-    const vRows = ["test", "train"].filter((k) => v[k]).map((k) => ["high", "mid", "low"].map((t) => { const x = v[k][t]; return `<tr><td>${k === "test" ? "<b>Unseen period</b>" : "Fitting period"}</td><td>${t} (${x.score_range[0]}–${x.score_range[1]})</td><td class="num">${x.n}</td><td class="num">${signC(x.mean_cont_24h, 2)}¢</td><td class="num">${x.held_pct}%</td></tr>`; }).join("")).join("");
-    el.innerHTML = `
-      <p>Kalshi's trade tape is anonymous, with no trader IDs, so "sharks" are inferred from <em>how</em> trades behave. The study used ${(model.trades || 0).toLocaleString()} trades in the most active economics markets${model.generated_at ? `, run ${new Date(model.generated_at).toLocaleDateString()}` : ""}.</p>
-      <p><strong>1. Big trades are informed, briefly.</strong> The average price change after each trade, from the taker's side (positive means they were right):</p>
-      <div class="scroll"><table><thead><tr><th>Trade size</th><th class="num">Trades</th><th class="num">+1h</th><th class="num">+24h</th></tr></thead><tbody>${mkRows}</tbody></table></div>
-      <p><strong>2. Most moves partly reverse, and informed-looking ones hold up better, modestly.</strong> The score's weights come from the first half of the period and were tested on the second half, which they never saw.${v.test ? ` On that unseen half, the top-scoring third held ${v.test.high.held_pct}% of the time against ${v.test.low.held_pct}% for the bottom third. The ordering is right, but the gap is within the error bars, and the fitting half looks stronger because it is in-sample. Read the score as "how much to trust a move", not as a trading signal on its own.` : ""}</p>
-      <div class="scroll"><table><thead><tr><th>Sample</th><th>Score third</th><th class="num">Moves</th><th class="num">Next 24h, in move's direction</th><th class="num">Held</th></tr></thead><tbody>${vRows}</tbody></table></div>
-      <p><strong>3. Following big-trade flow a day later didn't pay.</strong> The information gets priced in within hours, so the shark feed is most useful when you're watching live.</p>
-      <p class="tick">Small samples: treat differences under about 1¢ as noise. Full report: <a href="https://github.com/Yakiniku99/GenAI/blob/HEAD/research/informed_flow.md" target="_blank" rel="noopener">research/informed_flow.md</a>.</p>`;
   }
 
   // ---------- Expectations ----------
@@ -755,7 +738,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     if (roundsToZero(x, d)) x = 0;
     const sgn = x > 0 ? "+" : x < 0 ? "−" : "", a = Math.abs(x).toFixed(d);
     const txt = unit === "%" ? `${sgn}${a}pp` : unit === "$" ? `${sgn}$${a}` : unit === "$k" ? `${sgn}$${a}k`
-      : unit === "index" ? `${sgn}${a} pts` : unit === "¢/kWh" ? `${sgn}${a}¢` : `${sgn}${a} ${unit}`;
+      : unit === "index" ? `${sgn}${a} pts` : unit === "¢/kWh" ? `${sgn}${a}¢` : unit === "k" || unit === "M" ? `${sgn}${a}${unit}` : `${sgn}${a} ${unit}`;
     return `<span class="${Math.abs(x) < 1e-9 ? "flat" : ""}" style="font-weight:600">${txt}</span>`;
   };
   const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", year: "2-digit" });
@@ -808,86 +791,105 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     return groups.map((g) => `${g.name ? `<h3 class="grp">${esc(g.name)}</h3>` : (groups.length > 1 ? `<h3 class="grp">Headline</h3>` : "")}<div class="indicators">${g.items.map(indCard).join("")}</div>`).join("");
   }
 
+  const niceDate = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso), opts = { month: "short", day: "numeric" };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+    return d.toLocaleDateString(undefined, opts);
+  };
+
   function indCard(ind) {
     const dec = ind.decimals, unit = ind.unit;
     const num = (v, dd = dec) => v.toLocaleString(undefined, { minimumFractionDigits: dd, maximumFractionDigits: dd });
     const fmt = (v) => v == null ? "—" : unit === "$k" ? "$" + Math.round(v).toLocaleString() + "k"
-      : unit === "$" ? "$" + num(v) : unit === "index" ? num(v) : unit === "¢/kWh" ? num(v) + "¢/kWh"
-      : num(v) + (unit === "%" ? "%" : unit === "M" ? "M" : " " + unit);
-    // Axis labels: just the number, as short as the step allows.
-    const step = (d0) => { const xs = (d0.buckets || []).map((b) => b.hi ?? b.lo).filter((v) => v != null).sort((a, b) => a - b); return xs.length > 1 ? Math.min(...xs.slice(1).map((v, i) => v - xs[i]).filter((g) => g > 1e-9)) : 1; };
-    const short = (v, st) => { const dd = st >= 1 - 1e-6 ? 0 : st >= 0.1 - 1e-6 ? 1 : 2; return (unit === "$" ? "$" : "") + v.toLocaleString(undefined, { minimumFractionDigits: dd, maximumFractionDigits: dd }); };
+      : unit === "$" ? "$" + num(v) : unit === "index" ? num(v) : unit === "¢/kWh" ? num(v) + "¢"
+      : num(v) + (unit === "%" ? "%" : unit === "M" ? "M" : unit === "k" ? "k" : " " + unit);
     const pts = ind.points, d = pts[0], ch = d.change_24h;
-    const chip = (x) => {
-      if (x == null) return `<span class="chg flat" data-tip="${esc("No quotes on the same strikes 24 hours ago to compare against")}">24h: —</span>`;
-      const z = roundsToZero(x, dec), tipTxt = esc("Change in the market-implied median over the last 24 hours, measured on the strikes that traded both now and then");
-      if (z) return `<span class="chg flat" data-tip="${tipTxt}">unchanged in 24h</span>`;
-      return `<span class="chg" data-tip="${tipTxt}">${x > 0 ? "▲" : "▼"} ${delta(x, unit, dec)} <span class="tick">24h</span></span>`;
-    };
-    const headline = `<div class="vrow"><div class="v">${fmt(d.median)}</div>${chip(ch ? ch.median : null)}</div>`;
-    const stats = `<div class="r">Mean ${fmt(d.mean)}${ch ? ` (${delta(ch.mean, unit, dec + 1)})` : ""} · 10–90%: ${fmt(d.p10)} to ${fmt(d.p90)}${ch && (!roundsToZero(ch.p10, dec) || !roundsToZero(ch.p90, dec)) ? ` <span class="tick">(${delta(ch.p10, unit, dec)} / ${delta(ch.p90, unit, dec)})</span>` : ""}${d.low_confidence ? ` · <span class="badge warn" data-tip="${esc("Few liquid strikes, or much of the probability falls outside them. Treat as rough.")}">⚠ thin</span>` : ""}</div>`;
 
-    // Histogram of the next release: bars now, dashed marker = 24h ago.
-    let buckets = (d.buckets || []).slice();
-    while (buckets.length > 2 && buckets[0].p < 0.003 && (buckets[0].p_prev ?? 0) < 0.003) buckets.shift();
-    while (buckets.length > 2 && buckets[buckets.length - 1].p < 0.003 && (buckets[buckets.length - 1].p_prev ?? 0) < 0.003) buckets.pop();
-    const st = step(d), maxP = Math.max(...buckets.map((b) => Math.max(b.p, b.p_prev ?? 0)), 0.01);
-    const rangeTxt = (b) => b.lo == null ? `${fmt(b.hi)} or less` : b.hi == null ? `above ${fmt(b.lo)}` : `above ${fmt(b.lo)}, up to ${fmt(b.hi)}`;
-    const xl = (b) => b.lo == null ? "≤" + short(b.hi, st) : b.hi == null ? ">" + short(b.lo, st) : short(b.value, st);
-    const cols = buckets.map((b) => {
-      const prev = b.p_prev, dpp = prev == null ? null : (b.p - prev) * 100;
-      const tip = `<b>${esc(rangeTxt(b))}</b>Now: ${(b.p * 100).toFixed(1)}%` + (prev == null ? "<br>24h ago: not comparable" : `<br>24h ago: ${(prev * 100).toFixed(1)}% (${dpp >= 0 ? "+" : "−"}${Math.abs(dpp).toFixed(1)} pts)`);
-      return `<div class="col" data-tip="${esc(tip)}"><span class="pv">${Math.round(b.p * 100)}</span><div class="bar"><i style="height:${(b.p / maxP * 100).toFixed(1)}%"></i>${prev == null ? "" : `<b class="pm" style="bottom:${(prev / maxP * 100).toFixed(1)}%"></b>`}</div><span class="xl">${esc(xl(b))}</span></div>`;
-    }).join("");
-    const hist = buckets.length ? `<div class="hist-wrap"><div class="hist-cap"><span>Next release, probability by outcome (%)</span><span><i class="pm-key"></i>24h ago</span></div><div class="hist" role="img" aria-label="Implied distribution for ${esc(d.title)}">${cols}</div></div>` : "";
+    // 24h pill: median change on the face, the rest in its tooltip.
+    let pill;
+    if (!ch) pill = `<span class="pill24 flat" data-tip="${esc("No quotes on the same strikes 24 hours ago to compare against")}">24h —</span>`;
+    else {
+      const z = roundsToZero(ch.median, dec);
+      const tip = `<b>Change over 24 hours</b>Median: ${delta(ch.median, unit, dec)}<br>Mean: ${delta(ch.mean, unit, dec + 1)}<br>10th percentile: ${delta(ch.p10, unit, dec)}<br>90th percentile: ${delta(ch.p90, unit, dec)}`;
+      pill = z ? `<span class="pill24 flat" data-tip="${esc(tip)}">24h ±0</span>`
+        : `<span class="pill24" data-tip="${esc(tip)}">${ch.median > 0 ? "▲" : "▼"} ${delta(ch.median, unit, dec)}</span>`;
+    }
+    const thin = d.low_confidence ? `<span class="tag-thin" data-tip="${esc("Few liquid strikes, or much of the probability falls outside them. Treat as rough.")}">thin</span>` : "";
+    const period = d.period_label && d.period_label !== shortDate(d.date) && d.period_label !== niceDate(d.date) ? `${esc(d.period_label)} · ` : "";
+    const sub = `<div class="sub" title="${esc(d.title)}">${period}resolves ${niceDate(d.date)}</div>`;
+    const meta = `<div class="meta">10–90% ${fmt(d.p10)} – ${fmt(d.p90)} · mean ${fmt(d.mean)}</div>`;
 
-    const path = pts.length > 1 ? pathHtml(pts, fmt, unit, dec) : "";
-    const list = pts.length > 1 ? `<div class="pts">${pts.map((p) => `<span data-tip="${esc(`<b>${esc(p.title)}</b>Median ${fmt(p.median)} · 10–90%: ${fmt(p.p10)} to ${fmt(p.p90)}<br>24h: ${p.change_24h ? delta(p.change_24h.median, unit, dec) : "—"} · resolves ${date(p.date)}`)}">${esc(p.period_label || shortDate(p.date))}: <b>${fmt(p.median)}</b>${p.change_24h && !roundsToZero(p.change_24h.median, dec) ? ` <span class="tick">(${delta(p.change_24h.median, unit, dec)})</span>` : ""}${p.low_confidence ? "*" : ""}</span>`).join(" · ")}${pts.some((p) => p.low_confidence) ? ` <span class="tick">* thin market</span>` : ""}</div>` : "";
-    return `<div class="ind ${pts.length > 1 ? "has-path" : ""}" tabindex="0">
-      <div class="t">${esc(ind.label)}</div>
+    const hasPath = pts.length > 1;
+    const head = hasPath ? `<div class="chart-head"><span class="mini-seg" role="group" aria-label="Chart"><button type="button" data-view="path" aria-pressed="true">Path</button><button type="button" data-view="hist" aria-pressed="false">Next release</button></span></div>` : "";
+    return `<div class="ind" tabindex="0" data-view="${hasPath ? "path" : "hist"}">
+      <div class="ind-head"><div class="t">${esc(ind.label)}</div><div class="tags">${thin}${pill}</div></div>
       ${ind.note ? `<div class="note2">${esc(ind.note)}</div>` : ""}
-      ${headline}
-      <div class="r">${esc(d.title)} · resolves ${date(d.date)}</div>
-      ${stats}
-      ${pts.length > 1 ? `<div class="two">${path}${hist}</div>` : hist}
-      ${list}
+      <div class="v">${fmt(d.median)}</div>
+      ${sub}${meta}
+      <div class="chart">${head}${hasPath ? `<div class="c-path">${pathHtml(pts, fmt, unit, dec)}</div>` : ""}<div class="c-hist">${histHtml(d, fmt)}</div></div>
     </div>`;
   }
 
-  // One-year path: medians with a 10-90% band and a dashed 24h-ago line,
-  // x = the period each contract measures. Labels and dots are HTML so they
-  // don't stretch with the SVG.
+  // Bars = probability by outcome at the next release; dashed marker = 24h ago.
+  function histHtml(d, fmt) {
+    let bs = (d.buckets || []).slice();
+    const tiny = (b) => b.p < 0.003 && (b.p_prev ?? 0) < 0.003;
+    while (bs.length > 3 && tiny(bs[0])) bs.shift();
+    while (bs.length > 3 && tiny(bs[bs.length - 1])) bs.pop();
+    if (!bs.length) return "";
+    const maxP = Math.max(...bs.map((b) => Math.max(b.p, b.p_prev ?? 0)), 0.01);
+    const range = (b) => b.lo == null ? `${fmt(b.hi)} or less` : b.hi == null ? `above ${fmt(b.lo)}` : `${fmt(b.lo)} to ${fmt(b.hi)}`;
+    const lab = (b) => b.lo == null ? "≤" + fmt(b.hi) : b.hi == null ? ">" + fmt(b.lo) : fmt(b.value);
+    // About five evenly spaced axis labels; the last bucket replaces the final one if they'd collide.
+    const longest = Math.max(...bs.map((b) => lab(b).length));
+    const fit = Math.max(3, Math.min(5, Math.floor(250 / (longest * 6.2 + 10))));  // ~6px per character at 10px
+    const every = Math.max(1, Math.ceil(bs.length / fit)), lastI = bs.length - 1;
+    const shown = new Set();
+    for (let i = 0; i <= lastI; i += every) shown.add(i);
+    if (!shown.has(lastI)) { const prev = Math.floor(lastI / every) * every; if (lastI - prev < every * 0.85 && prev !== 0) shown.delete(prev); shown.add(lastI); }
+    return `<div class="hist" role="img" aria-label="Probability by outcome for ${esc(d.title)}">${bs.map((b, i) => {
+      const prev = b.p_prev, dpp = prev == null ? null : (b.p - prev) * 100;
+      const tip = `<b>${esc(range(b))}</b>Now ${(b.p * 100).toFixed(1)}%` + (prev == null ? "" : `<br>24h ago ${(prev * 100).toFixed(1)}% (${dpp >= 0 ? "+" : "−"}${Math.abs(dpp).toFixed(1)} pts)`);
+      return `<div class="col" data-tip="${esc(tip)}"><span class="pv">${Math.round(b.p * 100)}</span><div class="bar"><i style="height:${(b.p / maxP * 100).toFixed(1)}%"></i>${prev == null ? "" : `<b class="pm" style="bottom:${(prev / maxP * 100).toFixed(1)}%"></b>`}</div><div class="xl">${shown.has(i) ? `<span>${esc(lab(b))}</span>` : ""}</div></div>`;
+    }).join("")}</div>`;
+  }
+
+  // Path over the next year: median line, 10-90% band, dashed 24h-ago line.
   function pathHtml(pts, fmt, unit, dec) {
     const when = (p) => +new Date(p.period || p.date);
     const t0 = Math.min(Date.now(), ...pts.map(when));
-    const last = Math.max(...pts.map(when)), t1 = Math.max(last + (last - t0) * 0.08, Date.now() + 90 * 864e5);
+    const last = Math.max(...pts.map(when)), t1 = Math.max(last + (last - t0) * 0.08, t0 + 21 * 864e5);
     const prevMed = (p) => p.change_24h ? p.median - p.change_24h.median : null;
     const vals = pts.flatMap((p) => [p.p10, p.p90, p.median, prevMed(p)]).filter((v) => v != null);
     let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.12 || Math.abs(hi) * 0.05 || 0.1; lo -= pad; hi += pad;
-    const X = (t) => 5 + (t - t0) / (t1 - t0) * 90, Y = (v) => 16 + (hi - v) / (hi - lo) * 76; // percent of box
+    const X = (t) => 6 + (t - t0) / (t1 - t0) * 88, Y = (v) => 18 + (hi - v) / (hi - lo) * 74;
     const edge = (x) => x < 14 ? "l" : x > 86 ? "r" : "";
     const band = `M${pts.map((p) => `${X(when(p))},${Y(p.p90)}`).join("L")}L${pts.slice().reverse().map((p) => `${X(when(p))},${Y(p.p10)}`).join("L")}Z`;
     const line = `M${pts.map((p) => `${X(when(p))},${Y(p.median)}`).join("L")}`;
-    const prevPts = pts.filter((p) => prevMed(p) != null);
-    const prevLine = prevPts.length > 1 ? `<path d="M${prevPts.map((p) => `${X(when(p))},${Y(prevMed(p))}`).join("L")}" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>` : "";
+    const pp = pts.filter((p) => prevMed(p) != null);
+    const prevLine = pp.length > 1 ? `<path d="M${pp.map((p) => `${X(when(p))},${Y(prevMed(p))}`).join("L")}" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>` : "";
     const nowX = X(Date.now());
-    let svg = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="${band}" fill="var(--series-1)" opacity="0.2"/>${prevLine}<path d="${line}" fill="none" stroke="var(--series-1)" stroke-width="2" vector-effect="non-scaling-stroke"/><line x1="${nowX}" x2="${nowX}" y1="0" y2="100" stroke="var(--text-muted)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/></svg>`;
-    let lastLab = -99;
-    const dots = pts.map((p) => {
-      const tip = `<b>${esc(p.title)}</b>${esc(p.period_label || "")} · median ${fmt(p.median)}<br>10–90%: ${fmt(p.p10)} to ${fmt(p.p90)}<br>24h ago: ${prevMed(p) == null ? "not comparable" : fmt(prevMed(p)) + " (" + delta(p.change_24h.median, unit, dec) + ")"}`;
-      const x = X(when(p)), e = edge(x), showLab = x - lastLab >= 12 || p === pts[pts.length - 1];
-      if (showLab) lastLab = x;
-      return `<span class="pdot" style="left:${x}%;top:${Y(p.median)}%" data-tip="${esc(tip)}"></span>${showLab ? `<span class="plab ${e}" style="left:${x}%;top:${Y(p.median)}%">${fmt(p.median)}</span>` : ""}`;
+    const svg = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="${band}" fill="var(--series-1)" opacity="0.2"/>${prevLine}<path d="${line}" fill="none" stroke="var(--series-1)" stroke-width="2" vector-effect="non-scaling-stroke"/><line x1="${nowX}" x2="${nowX}" y1="0" y2="100" stroke="var(--text-muted)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/></svg>`;
+    let lastLab = -99, lastAx = -99;
+    const marks = pts.map((p, i) => {
+      const x = X(when(p)), e = edge(x), isLast = i === pts.length - 1;
+      const tip = `<b>${esc(p.period_label || p.title)}</b>Median ${fmt(p.median)}<br>10–90% ${fmt(p.p10)} – ${fmt(p.p90)}<br>24h ago ${prevMed(p) == null ? "—" : fmt(prevMed(p))}<br><span class="tick">${esc(p.title)} · resolves ${niceDate(p.date)}</span>`;
+      const lab = x - lastLab >= 14 || isLast ? (lastLab = x, `<span class="plab ${e}" style="left:${x}%;top:${Y(p.median)}%">${fmt(p.median)}</span>`) : "";
+      return `<span class="pdot" style="left:${x}%;top:${Y(p.median)}%" data-tip="${esc(tip)}"></span>${lab}`;
     }).join("");
-    // Period labels under the axis, skipping any that would collide with the previous one.
-    let lastX = -99;
-    const xlabels = pts.map((p) => { const x = X(when(p)); if (x - lastX < 12) return ""; lastX = x; return `<span class="pxl ${edge(x)}" style="left:${x}%">${esc(p.period_label || "")}</span>`; }).join("");
-    return `<div class="pathbox" role="img" aria-label="Implied path over the next year">
-      <div class="pcap"><span>Implied path (median, 10–90% band)</span><span><i class="dash-key"></i>24h ago</span></div>
-      <div class="plot">${svg}${dots}<span class="ptoday" style="left:${nowX}%">today</span></div>
-      <div class="paxis">${xlabels}</div>
-    </div>`;
+    const axis = pts.map((p, i) => { const x = X(when(p)); if (x - lastAx < 14 && i !== pts.length - 1) return ""; if (x - lastAx < 14) return ""; lastAx = x; return `<span class="pxl ${edge(x)}" style="left:${x}%">${esc(p.period_label || "")}</span>`; }).join("");
+    return `<div class="pathbox" role="img" aria-label="Implied path over the next year"><div class="plot">${svg}${marks}<span class="ptoday" style="left:${nowX}%">today</span></div><div class="paxis">${axis}</div></div>`;
   }
+
+  // Path / Next release toggle on cards with a path.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest && e.target.closest(".mini-seg button");
+    if (!b) return;
+    const card = b.closest(".ind");
+    card.dataset.view = b.dataset.view;
+    card.querySelectorAll(".mini-seg button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  });
 
   // Shared tooltip for anything with data-tip on the Expectations and What moved tabs.
   (() => {
@@ -1043,7 +1045,9 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     try { await fetch("api/refresh", { method: "POST" }); } catch (_) {}
     setTimeout(poll, 500);
   });
-  let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (state.view === "chart") renderNearChart(); renderMacro(); }, 150); });
+  // Re-render charts only when the width changes (phones fire height-only resizes as the address bar hides).
+  let rz, lastW = window.innerWidth;
+  window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; if (state.view === "chart") renderNearChart(); renderMacro(); }, 150); });
   const initial = (location.hash || "").slice(1);
   showTab(["arb", "moved", "macro"].includes(initial) ? initial : "moved");
   poll();

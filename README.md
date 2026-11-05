@@ -4,7 +4,7 @@ A live dashboard over every open **Economics** market on [Kalshi](https://kalshi
 
 * **What moved**: the biggest 24h repricings, each scored for whether it looks like **informed
   trading or noise**, plus a "shark watch" feed of large trades. The score is backed by a study of
-  Kalshi's own trade tape (see [Informed-flow research](#informed-flow-research)).
+  Kalshi's own trade tape, kept in the repo rather than on the page (see [Informed-flow research](#informed-flow-research)).
 * **Expectations**: market-implied forecasts in sections (**Interest rates**, **Housing**,
   **Inflation**, **Employment**, **Growth**), each with a one-year implied path where Kalshi lists one.
 * **Arbitrage**: baskets of contracts whose *guaranteed* settlement payout is worth more than
