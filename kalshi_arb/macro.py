@@ -55,7 +55,8 @@ def _non_increasing(ps: list[float]) -> list[float]:
 
 
 def ladder_distribution(markets: list[dict], previous: bool = False, discrete: bool = False,
-                        scale: float = 1.0, only: set[str] | None = None) -> dict | None:
+                        scale: float = 1.0, only: set[str] | None = None,
+                        discrete_step: float = 0.1) -> dict | None:
     """Distribution from "above X" markets.
 
     discrete=True: the outcome is reported on the strike grid (Fed rate in
@@ -77,6 +78,9 @@ def ladder_distribution(markets: list[dict], previous: bool = False, discrete: b
     probs = _non_increasing([p for _, p in pts])
     gaps = sorted(b - a for a, b in zip(strikes, strikes[1:]))
     step = gaps[len(gaps) // 2]
+    # Strike values are exact outcomes only when the grid matches the reporting
+    # precision (CPI to 0.1, Fed in 25bp); a coarser grid is a range.
+    discrete = discrete and step <= discrete_step + 1e-9
 
     buckets = [{"lo": None, "hi": strikes[0], "p": 1 - probs[0],
                 "value": strikes[0] if discrete else strikes[0] - step / 2}]
@@ -122,20 +126,66 @@ def ladder_distribution(markets: list[dict], previous: bool = False, discrete: b
     }
 
 
-# (series, label, unit, discrete grid, scale, decimals)
 FED_SERIES = "KXFED"
-INDICATORS = (
-    ("KXCPI", "CPI, month over month", "%", True, 1.0, 1),
-    ("KXCPIYOY", "CPI, year over year", "%", True, 1.0, 1),
-    ("KXCPICOREYOY", "Core CPI, year over year", "%", True, 1.0, 1),
-    ("KXPAYROLLS", "Nonfarm payrolls", "k jobs", False, 0.001, 0),
-    ("KXU3", "Unemployment rate", "%", True, 1.0, 1),
-    ("KXGDP", "Real GDP growth (annualized)", "%", False, 1.0, 1),
+HORIZON_DAYS = 460  # a year ahead, plus the lag before next year's year-end contracts resolve
+
+
+def ind(key, label, unit, decimals, series, discrete=False, scale=1.0, note="", discrete_step=0.1):
+    return {"key": key, "label": label, "unit": unit, "decimals": decimals, "series": series,
+            "discrete": discrete, "scale": scale, "note": note, "discrete_step": discrete_step}
+
+
+# Each indicator joins its monthly/quarterly release markets with any year-end
+# contract for the same quantity, which gives a path up to a year out.
+SECTIONS = (
+    ("rates", "Interest rates", (
+        ind("fedfunds_ye", "Fed funds rate at year-end", "%", 2, ["KXFEDFUNDSYEAR"], discrete=True, discrete_step=0.25,
+            note="Year-end contract; cross-check for the path above"),
+        ind("effr", "Effective fed funds rate, end of quarter", "%", 2, ["KXEFFR"]),
+    )),
+    ("housing", "Housing", (
+        ind("mortgage_week", "30-year mortgage rate (this week)", "%", 2, ["KX30YMORTW"]),
+        ind("mortgage_high", "Highest 30-year mortgage rate this year", "%", 2, ["KXMORTGAGERATE"],
+            note="The year's peak, not its level"),
+        ind("existing_sales", "Existing home sales (annualized)", "M", 2, ["KXEHSALES"]),
+        ind("new_sales", "New home sales (annualized)", "k", 0, ["KXNHSALES"], scale=0.001),
+        ind("starts", "Housing starts (annualized)", "M", 2, ["KXHOUSINGSTART"]),
+        ind("permits", "Building permits (annualized)", "M", 2, ["KXBUILDPERMS"]),
+        ind("existing_price", "Median existing home price", "$k", 0, ["KXEXUSHOME"], scale=0.001),
+        ind("new_price", "Median new home price", "$k", 0, ["KXUSHOME"], scale=0.001),
+        ind("listings", "Active housing listings", "k", 0, ["KXUSHOMEINVENT"], scale=0.001),
+    )),
+    ("inflation", "Inflation", (
+        ind("cpi_yoy", "CPI, year over year", "%", 1, ["KXCPIYOY", "KXUSCPIYEAR"], discrete=True,
+            note="Monthly releases, anchored by the December-next-year contract"),
+        ind("core_yoy", "Core CPI, year over year", "%", 1, ["KXCPICOREYOY"], discrete=True),
+        ind("cpi_mom", "CPI, month over month", "%", 1, ["KXCPI"], discrete=True),
+        ind("core_mom", "Core CPI, month over month", "%", 1, ["KXCPICORE"], discrete=True),
+        ind("ppi_mom", "PPI, month over month", "%", 1, ["KXUSPPI"], discrete=True),
+        ind("ppi_yoy", "PPI, year over year", "%", 1, ["KXUSPPIYOY"], discrete=True),
+        ind("pce", "PCE inflation, month over month", "%", 1, ["KXPCEHEAD"], discrete=True),
+        ind("core_pce", "Core PCE, month over month", "%", 1, ["KXPCECORE"], discrete=True),
+    )),
+    ("employment", "Employment", (
+        ind("unemployment", "Unemployment rate", "%", 1, ["KXU3", "KXU3EOY"], discrete=True,
+            note="Monthly releases plus year-end contracts"),
+        ind("payrolls", "Nonfarm payrolls, monthly change", "k", 0, ["KXPAYROLLS"], scale=0.001),
+        ind("claims", "Initial jobless claims (weekly)", "k", 0, ["KXJOBLESSCLAIMS"], scale=0.001),
+        ind("cont_claims", "Continuing jobless claims (weekly)", "k", 0, ["KXCONTCLAIMS"]),
+        ind("earnings", "Average hourly earnings, month over month", "%", 1, ["KXAHEMOM"], discrete=True),
+        ind("lfpr", "Labor force participation, year-end", "%", 2, ["KXLFPRATEEOY"]),
+    )),
+    ("growth", "Growth", (
+        ind("gdp", "Real GDP growth (quarterly, annualized)", "%", 1, ["KXGDP"]),
+        ind("nominal_gdp", "Nominal GDP growth (calendar year)", "%", 1, ["KXNOMGDPGROWTH"]),
+    )),
 )
 
 
 def _event_time(e: dict) -> str:
-    closes = [m.get("close_time") or "" for m in e.get("markets") or []]
+    # Active markets only: ladder strikes that already closed early (e.g. a
+    # "how high this year" level that was hit) would date the event in the past.
+    closes = [m.get("close_time") or "" for m in e.get("markets") or [] if m.get("status") == "active"]
     return e.get("strike_date") or (min(closes) if closes else "")
 
 
@@ -150,16 +200,16 @@ def _liquid(m: dict, previous: bool) -> bool:
     return market_mid(m, previous, MAX_SPREAD) is not None
 
 
-def _dist_pair(markets, discrete, scale):
+def _dist_pair(markets, discrete, scale, discrete_step=0.1):
     """Current distribution plus its 24h change, with the change measured on
     the strikes that were liquid both now and 24h ago (otherwise a strike
     dropping in or out of the liquid set looks like a move)."""
-    now = ladder_distribution(markets, False, discrete, scale)
+    now = ladder_distribution(markets, False, discrete, scale, discrete_step=discrete_step)
     if not now:
         return None
     common = {m["ticker"] for m in markets if _liquid(m, False) and _liquid(m, True)}
-    a = ladder_distribution(markets, False, discrete, scale, common)
-    b = ladder_distribution(markets, True, discrete, scale, common)
+    a = ladder_distribution(markets, False, discrete, scale, common, discrete_step)
+    b = ladder_distribution(markets, True, discrete, scale, common, discrete_step)
     change = None
     if a and b:
         change = {k: round(a[k] - b[k], 4) for k in ("mean", "p10", "median", "p90")}
@@ -182,7 +232,7 @@ def decision_change(label: str) -> float | None:
     return (bp if m.group(1) in ("hike", "raise") else -bp) / 100
 
 
-def fed_path(events: list[dict], now: datetime, max_meetings: int = 8) -> dict:
+def fed_path(events: list[dict], now: datetime, max_meetings: int = 9, days: int = 366) -> dict:
     """Expected Fed upper bound after each meeting.
 
     The path comes from the (liquid) hike/hold/cut markets: today's rate plus
@@ -191,7 +241,9 @@ def fed_path(events: list[dict], now: datetime, max_meetings: int = 8) -> dict:
     10-90% range where its strikes are liquid enough."""
     decisions = {e.get("strike_date"): e for e in events if e.get("series_ticker") == "KXFEDDECISION"}
     ladders = {e.get("strike_date"): e for e in events if e.get("series_ticker") == FED_SERIES}
-    dates = sorted(d for d in set(decisions) | set(ladders) if d and d >= now.isoformat()[:19])[:max_meetings]
+    horizon = datetime.fromtimestamp(now.timestamp() + days * 86400, timezone.utc).isoformat()[:19]
+    dates = sorted(d for d in set(decisions) | set(ladders)
+                   if d and now.isoformat()[:19] <= d <= horizon)[:max_meetings]
     meetings, current = [], None
     for date in dates:
         row: dict = {"date": date}
@@ -207,7 +259,7 @@ def fed_path(events: list[dict], now: datetime, max_meetings: int = 8) -> dict:
                 row["decision_ticker"] = dec["event_ticker"]
         lad = ladders.get(date)
         if lad:
-            d = _dist_pair(lad["markets"], True, 1.0)
+            d = _dist_pair(lad["markets"], True, 1.0, 0.25)
             if d:
                 row["ladder"] = {k: d[k] for k in ("mean", "p10", "median", "p90", "mode", "low_confidence",
                                                    "liquid_strikes", "change_24h")}
@@ -250,17 +302,77 @@ def outcome_probs(event: dict) -> list[dict]:
     return sorted(rows, key=lambda r: -r["p"])
 
 
-def indicators(events: list[dict], now: datetime) -> list[dict]:
-    out = []
-    for series, label, unit, discrete, scale, decimals in INDICATORS:
-        for e in _upcoming(events, series, now)[:2]:
-            d = _dist_pair(e["markets"], discrete, scale)
+_MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august",
+           "september", "october", "november", "december")
+_MONTH_RE = re.compile(r"\b(" + "|".join(m[:3] + "(?:" + m[3:] + ")?" for m in _MONTHS)
+                       + r")\b\.?(?:\s+(?:\d{1,2},\s*)?(\d{4}))?", re.I)
+
+
+def reference_period(title: str, resolves: str) -> tuple[str, str]:
+    """(label, ISO date) of the period a contract measures, from its title:
+    "CPI YoY in November" -> Nov of the latest November before it resolves;
+    "...in December 2027" / "year-end 2027" -> Dec 2027; "Q4 2026" -> Q4 2026.
+    Falls back to the resolution date."""
+    res = datetime.fromisoformat(resolves.replace("Z", "+00:00")) if resolves else None
+    t = title.lower()
+    q = re.search(r"\bq([1-4])\s*(\d{4})", t)
+    if q:
+        qn, y = int(q.group(1)), int(q.group(2))
+        return f"Q{qn} {str(y)[2:]}", datetime(y, qn * 3, 15, tzinfo=timezone.utc).isoformat()
+    ye = re.search(r"(year-end|end of|in)\s+(\d{4})\b", t)
+    m = _MONTH_RE.search(title)
+    if m:
+        month = next(i for i, name in enumerate(_MONTHS, 1) if name.startswith(m.group(1).lower()[:3]))
+        if m.group(2):
+            year = int(m.group(2))
+        elif res:
+            year = res.year if month <= res.month else res.year - 1
+        else:
+            return title, resolves
+        d = datetime(year, month, 15, tzinfo=timezone.utc)
+        return d.strftime("%b ") + str(year)[2:], d.isoformat()
+    if ye:
+        y = int(ye.group(2))
+        label = str(y) if ye.group(1) == "in" else f"Dec {str(y)[2:]}"  # calendar year vs year-end
+        return label, datetime(y, 12, 15, tzinfo=timezone.utc).isoformat()
+    if res:
+        return res.strftime("%b ") + str(res.year)[2:], res.isoformat()
+    return title, resolves
+
+
+def indicator(cfg: dict, events: list[dict], now: datetime) -> dict | None:
+    """Upcoming points (one per release or year-end contract within a year),
+    each with median, 10-90% range, mean and 24h change. The first point also
+    carries its full distribution."""
+    limit = datetime.fromtimestamp(now.timestamp() + HORIZON_DAYS * 86400, timezone.utc).isoformat()[:19]
+    points = []
+    for series in cfg["series"]:
+        for e in _upcoming(events, series, now):
+            when = _event_time(e)
+            if when > limit:
+                break
+            d = _dist_pair(e["markets"], cfg["discrete"], cfg["scale"], cfg.get("discrete_step", 0.1))
             if not d:
                 continue
-            out.append({"series": series, "label": label, "unit": unit, "decimals": decimals,
-                        "event_ticker": e["event_ticker"], "title": e.get("title", ""),
-                        "resolves": _event_time(e), **d,
-                        "volume_24h": round(sum(_f(m.get("volume_24h_fp")) or 0 for m in e["markets"]), 2)})
+            label, period = reference_period(e.get("title", ""), when)
+            points.append({"event_ticker": e["event_ticker"], "title": e.get("title", ""), "date": when,
+                           "period": period, "period_label": label,
+                           "series": series, "volume_24h": round(sum(_f(m.get("volume_24h_fp")) or 0 for m in e["markets"]), 2),
+                           **{k: d[k] for k in ("median", "p10", "p90", "mean", "mode", "low_confidence",
+                                                "liquid_strikes", "change_24h", "buckets")}})
+    if not points:
+        return None
+    points.sort(key=lambda p: (p["period"], p["date"]))
+    for p in points[1:]:
+        p.pop("buckets", None)  # keep the snapshot small: only the next release's histogram
+    return {k: cfg[k] for k in ("key", "label", "unit", "decimals", "note")} | {"points": points}
+
+
+def sections(events: list[dict], now: datetime) -> list[dict]:
+    out = []
+    for key, title, cfgs in SECTIONS:
+        items = [x for x in (indicator(c, events, now) for c in cfgs) if x]
+        out.append({"key": key, "title": title, "indicators": items})
     return out
 
 
@@ -288,4 +400,4 @@ def gauges(events: list[dict], now: datetime) -> list[dict]:
 
 def build_macro(events: list[dict], now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
-    return {"fed_path": fed_path(events, now), "indicators": indicators(events, now), "gauges": gauges(events, now)}
+    return {"fed_path": fed_path(events, now), "sections": sections(events, now), "gauges": gauges(events, now)}

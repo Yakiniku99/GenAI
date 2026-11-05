@@ -2,13 +2,13 @@
 
 A live dashboard over every open **Economics** market on [Kalshi](https://kalshi.com), with three views:
 
-* **Arbitrage**: baskets of contracts whose *guaranteed* settlement payout is worth more than
-  what they cost to buy right now, after trading fees.
 * **What moved**: the biggest 24h repricings, each scored for whether it looks like **informed
   trading or noise**, plus a "shark watch" feed of large trades. The score is backed by a study of
   Kalshi's own trade tape (see [Informed-flow research](#informed-flow-research)).
-* **Expectations**: the Fed funds path, CPI, payrolls, unemployment and GDP as market-implied
-  distributions, with 24h shifts and recession and rate-cut gauges.
+* **Expectations**: market-implied forecasts in sections (**Interest rates**, **Housing**,
+  **Inflation**, **Employment**, **Growth**), each with a one-year implied path where Kalshi lists one.
+* **Arbitrage**: baskets of contracts whose *guaranteed* settlement payout is worth more than
+  what they cost to buy right now, after trading fees.
 
  **Fees default to Robinhood's schedule**
 (for trading Kalshi contracts through Robinhood); Robinhood Gold and Kalshi-direct are also available.
@@ -162,6 +162,17 @@ fitted on the first half of the study period and checked on the second half.
 with how the price has moved since, from the taker's side.
 
 ## Expectations
+
+| Section | Indicators (Kalshi series) | One-year path |
+|---|---|---|
+| Interest rates | Fed path from FOMC decision markets (KXFEDDECISION + KXFED), fed funds at year-end, EFFR | Every meeting in the next 12 months |
+| Housing | 30Y mortgage rate this week, this year's mortgage-rate high, existing and new home sales, housing starts, building permits, median existing and new home prices, active listings | Next release only (Kalshi lists one month ahead) |
+| Inflation | CPI and core CPI (y/y and m/m), PPI (m/m, y/y), PCE and core PCE | CPI y/y: monthly releases plus the December-next-year contract |
+| Employment | Unemployment, payrolls, initial and continuing claims, hourly earnings, labor force participation | Unemployment: monthly plus year-end contracts for this year and next |
+| Growth | Real GDP (quarterly), nominal GDP (calendar year) | Next three quarters |
+
+Paths are plotted by the period each contract measures (read from its title, e.g. "CPI YoY in
+November" → Nov), with the 10–90% band.
 
 * **Fed path**: expected upper bound after each FOMC meeting. This is today's rate plus the running
   sum of expected changes from the hike, hold and cut markets (expectations add up whatever the

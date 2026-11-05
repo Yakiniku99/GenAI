@@ -2,7 +2,8 @@ import unittest
 from datetime import datetime, timezone
 
 from kalshi_arb.flow import MidSeries, Trade, big_trade_threshold, move_features, parse_trades
-from kalshi_arb.macro import _non_increasing, build_macro, decision_change, ladder_distribution
+from kalshi_arb.macro import (_non_increasing, build_macro, decision_change, ladder_distribution,
+                              reference_period)
 from kalshi_arb.signals import find_movers, informed_score
 
 NOW = datetime(2026, 11, 5, tzinfo=timezone.utc)
@@ -42,6 +43,22 @@ class LadderTests(unittest.TestCase):
         self.assertEqual(decision_change("Fed maintains rate"), 0.0)
         self.assertIsNone(decision_change("Something else"))
 
+    def test_coarse_grid_is_not_discrete(self):
+        # Year-end unemployment uses 0.5-point strikes but is reported to 0.1:
+        # "above 4.0%" can resolve at 4.1, so strikes must be treated as ranges.
+        ms = [rung("a", 3.5, 0.97, 0.99), rung("b", 4.0, 0.69, 0.71), rung("c", 4.5, 0.19, 0.21), rung("d", 5.0, 0.04, 0.06)]
+        self.assertAlmostEqual(ladder_distribution(ms, discrete=True)["median"], 4.0 + 0.5 * (0.5 - 0.3) / 0.5)
+
+    def test_reference_periods(self):
+        cases = [("CPI YoY in November", "2026-12-10T12:30:00Z", "Nov 26"),
+                 ("US headline CPI inflation in December 2027", "2028-02-01T00:00:00Z", "Dec 27"),
+                 ("US unemployment rate at year-end 2027", "2028-01-07T00:00:00Z", "Dec 27"),
+                 ("US real GDP growth in Q1 2027?", "2027-04-29T00:00:00Z", "Q1 27"),
+                 ("US nominal GDP growth in 2027", "2028-01-28T00:00:00Z", "2027"),
+                 ("Unemployment in October", "2026-11-06T00:00:00Z", "Oct 26")]
+        for title, resolves, want in cases:
+            self.assertEqual(reference_period(title, resolves)[0], want, title)
+
 
 class FedPathTests(unittest.TestCase):
     def test_path_is_cumulative_expected_change(self):
@@ -60,7 +77,9 @@ class FedPathTests(unittest.TestCase):
                   "markets": [rung(f"r{s}", s, p - .005, p + .005) for s, p in
                               ((3.5, 0.995), (3.75, 0.99), (4.0, 0.80), (4.25, 0.01), (4.5, 0.005))]}
         events = [decision("D1", date1, 0.8, 0.2), decision("D2", date2, 0.5, 0.5), ladder]
-        fp = build_macro(events, NOW)["fed_path"]
+        macro = build_macro(events, NOW)
+        self.assertEqual([x["key"] for x in macro["sections"]], ["rates", "housing", "inflation", "employment", "growth"])
+        fp = macro["fed_path"]
         self.assertEqual(fp["current_upper_bound"], 4.0)
         exp = [m["expected"] for m in fp["meetings"]]
         self.assertAlmostEqual(exp[0], 4.20, places=2)
