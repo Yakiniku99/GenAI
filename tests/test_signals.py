@@ -31,6 +31,16 @@ class LadderTests(unittest.TestCase):
         self.assertEqual(d["median"], 3.1)
         self.assertEqual(d["p10"], 3.0)
 
+    def test_bucket_change_24h(self):
+        from kalshi_arb.macro import _dist_pair
+        # P(>3.1) rose from 0.30 to 0.50 overnight
+        ms = [rung("a", 3.0, 0.89, 0.91), rung("b", 3.1, 0.49, 0.51, 0.29, 0.31), rung("c", 3.2, 0.09, 0.11)]
+        d = _dist_pair(ms, True, 1.0)
+        by = {(x["lo"], x["hi"]): x for x in d["buckets"]}
+        self.assertAlmostEqual(by[(3.1, 3.2)]["p"], 0.40)
+        self.assertAlmostEqual(by[(3.1, 3.2)]["p_prev"], 0.20)
+        self.assertAlmostEqual(d["change_24h"]["mean"], 0.02, places=3)
+
     def test_wide_spreads_are_ignored(self):
         ms = [rung("a", 1, 0.95, 0.97), rung("b", 2, 0.60, 0.62), rung("c", 3, 0.0, 0.50), rung("d", 4, 0.05, 0.07)]
         d = ladder_distribution(ms)

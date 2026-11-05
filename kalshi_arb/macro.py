@@ -243,6 +243,11 @@ def _dist_pair(markets, discrete, scale, discrete_step=0.1):
     if a and b:
         change = {k: round(a[k] - b[k], 4) for k in ("mean", "p10", "median", "p90")}
     prev = {k: round(now[k] - change[k], 4) for k in change} if change else None
+    # 24h-ago probability for each displayed bucket, where the same strikes bound it.
+    if b:
+        prev_p = {(x["lo"], x["hi"]): x["p"] for x in b["buckets"]}
+        for x in now["buckets"]:
+            x["p_prev"] = prev_p.get((x["lo"], x["hi"]))
     return {**now, "change_24h": change, "prev": prev}
 
 
