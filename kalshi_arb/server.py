@@ -63,7 +63,7 @@ def _scan_loop(state: State, args) -> None:
                 state.progress = (done, total)
 
         try:
-            snap = scan(client, args.category, only, args.workers, progress, args.fees, args.depth)
+            snap = scan(client, args.category, only, args.workers, progress, args.fees, args.depth, getattr(args, "signals", True))
             snap["full_discovery"] = full
             active = sorted({o["series_ticker"] for o in snap["opportunities"]}
                             | set(snap["series_titles"]))

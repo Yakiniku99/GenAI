@@ -11,6 +11,8 @@ from .arbitrage import (DEFAULT_FEE_MODEL, FEE_MODELS, Opportunity, Quote, analy
                         asks_from_orderbook, depth_within, mark_stale, strike_coverage_is_exhaustive,
                         walk_book)
 from .client import KalshiClient
+from .macro import build_macro
+from .signals import build_signals
 
 ProgressFn = Callable[[int, int], None]
 
@@ -77,24 +79,14 @@ def add_book_depth(client: KalshiClient, opps: list[Opportunity], fee_model: str
     return errors
 
 
-def scan(
-    client: KalshiClient | None = None,
-    category: str = "Economics",
-    series_filter: list[str] | None = None,
-    workers: int = 10,
-    progress: ProgressFn | None = None,
-    fee_model: str = DEFAULT_FEE_MODEL,
-    depth_candidates: int = 40,
-) -> dict:
-    client = client or KalshiClient()
-    started = time.time()
+def fetch_open_events(client: KalshiClient, category: str = "Economics",
+                      series_filter: list[str] | None = None, workers: int = 10,
+                      progress: ProgressFn | None = None) -> tuple[list[dict], list[dict], list[str]]:
+    """All open events (with nested markets) for every series in `category`."""
     series = client.series(category)
     if series_filter:
         wanted = {s.upper() for s in series_filter}
         series = [s for s in series if s["ticker"].upper() in wanted]
-    fee_mult = {s["ticker"]: float(s.get("fee_multiplier", 1) or 0) for s in series}
-    titles = {s["ticker"]: s.get("title", "") for s in series}
-
     events: list[dict] = []
     errors: list[str] = []
     done = 0
@@ -108,6 +100,24 @@ def scan(
             done += 1
             if progress:
                 progress(done, len(series))
+    return series, events, errors
+
+
+def scan(
+    client: KalshiClient | None = None,
+    category: str = "Economics",
+    series_filter: list[str] | None = None,
+    workers: int = 10,
+    progress: ProgressFn | None = None,
+    fee_model: str = DEFAULT_FEE_MODEL,
+    depth_candidates: int = 40,
+    signals: bool = True,
+) -> dict:
+    client = client or KalshiClient()
+    started = time.time()
+    series, events, errors = fetch_open_events(client, category, series_filter, workers, progress)
+    fee_mult = {s["ticker"]: float(s.get("fee_multiplier", 1) or 0) for s in series}
+    titles = {s["ticker"]: s.get("title", "") for s in series}
 
     now = datetime.now(timezone.utc)
     opps = analyze_events(events, fee_mult, now, fee_model)
@@ -116,6 +126,11 @@ def scan(
     # Trustworthy baskets first; filtered ones (stale / outdated / missing outcome) sink.
     opps.sort(key=lambda o: (not o.filter_reasons, o.is_arb, o.net_edge, o.net_profit), reverse=True)
     summaries = [s for s in (_event_summary(e) for e in events) if s]
+    macro = build_macro(events, now)
+    sig = None
+    if signals:
+        sig, sig_errors = build_signals(client, events, workers=min(workers, 8), now=now)
+        errors += sig_errors
     n_markets = sum(len(e.get("markets") or []) for e in events)
     return {
         "generated_at": now.isoformat(),
@@ -132,5 +147,7 @@ def scan(
         "filtered_count": sum(1 for o in opps if o.filter_reasons),
         "opportunities": [o.to_dict() for o in opps],
         "mutually_exclusive_events": sorted(summaries, key=lambda s: -(s["volume_24h"] or 0)),
+        "macro": macro,
+        "signals": sig,
         "errors": errors,
     }

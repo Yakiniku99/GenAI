@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kalshi Economics Arbitrage</title>
+<title>Kalshi Economics Signals</title>
 <style>
 :root {
   color-scheme: light;
@@ -112,6 +112,46 @@ tbody tr.row-filtered { box-shadow: inset 5px 0 0 var(--border); }
 a.btn { display: inline-block; text-decoration: none; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 14px; }
 a.btn:hover { border-color: var(--accent); }
 #refresh-msg { font-size: 12px; color: var(--text-secondary); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 16px; overflow-x: auto; }
+.tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 14px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
+.tabs .count { font-weight: 500; color: var(--text-muted); margin-left: 4px; }
+.movers { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; padding: 16px; }
+.mover { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface-1); display: flex; flex-direction: column; gap: 8px; }
+.mover.informed { border-color: var(--good); box-shadow: inset 4px 0 0 var(--good); }
+.mover.mixed { box-shadow: inset 4px 0 0 var(--warning); }
+.mover.noise { box-shadow: inset 4px 0 0 var(--border); }
+.mover h3 { font-size: 14px; margin: 0; line-height: 1.3; }
+.mover .sub { font-size: 12px; color: var(--text-secondary); }
+.mover .move { display: flex; align-items: baseline; gap: 10px; font-variant-numeric: tabular-nums; }
+.mover .move .big { font-size: 22px; font-weight: 700; }
+.mover .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; font-size: 12px; color: var(--text-secondary); }
+.mover .stats b { color: var(--text-primary); font-weight: 600; }
+.comp { display: grid; grid-template-columns: 1fr 80px; gap: 3px 8px; font-size: 11px; color: var(--text-secondary); align-items: center; }
+.comp .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.comp .bar i { display: block; height: 100%; background: var(--series-1); border-radius: 3px; }
+.spark { width: 100%; height: 56px; display: block; }
+.score { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; padding: 3px 10px; border-radius: 999px; }
+.score.informed { background: var(--good); color: #fff; }
+.score.mixed { background: var(--warning-bg); color: var(--warning-ink); border: 1px solid var(--warning); }
+.score.noise { background: var(--surface-2); color: var(--text-secondary); }
+.trades-mini { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); }
+.mover a.news { font-size: 12px; color: var(--accent); text-decoration: none; }
+.gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.indicators { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding: 16px; }
+.ind { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-1); }
+.ind .t { font-size: 12px; color: var(--text-secondary); }
+.ind .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 2px 0; }
+.ind .r { font-size: 12px; color: var(--text-secondary); }
+.ind svg { width: 100%; height: 54px; display: block; margin-top: 6px; }
+.up { color: var(--good-ink); }
+.down { color: var(--critical); }
+.flat { color: var(--text-muted); }
+.note { font-size: 12px; color: var(--text-muted); padding: 0 16px 14px; }
+.research { padding: 4px 16px 16px; font-size: 13px; color: var(--text-secondary); }
+.research table { margin: 8px 0 12px; }
+.research th, .research td { padding: 6px 10px; }
+
 td.event { white-space: normal; min-width: 220px; max-width: 360px; }
 td.event a { color: var(--text-primary); text-decoration: none; font-weight: 500; }
 td.event a:hover { text-decoration: underline; }
@@ -154,8 +194,8 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
 <div class="wrap">
   <header>
     <div>
-      <h1>Kalshi Economics Arbitrage</h1>
-      <p class="sub">Baskets of contracts whose guaranteed payout is worth more than their cost to buy right now, after <span id="fee-label">trading fees</span>.</p>
+      <h1>Kalshi Economics Signals</h1>
+      <p class="sub">Arbitrage after <span id="fee-label">trading fees</span>, informed-flow signals and market-implied macro expectations from Kalshi's economics markets.</p>
     </div>
     <div class="status">
       <span id="status"><span class="dot"></span>Connecting…</span>
@@ -167,6 +207,13 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
 
   <div class="error" id="error"></div>
 
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button role="tab" data-tab="arb" aria-selected="true">Arbitrage</button>
+    <button role="tab" data-tab="moved" aria-selected="false">What moved <span class="count" id="moved-count"></span></button>
+    <button role="tab" data-tab="macro" aria-selected="false">Expectations</button>
+  </nav>
+
+  <div class="tab-panel" id="tab-arb">
   <div class="banner none" id="banner" role="status" aria-live="polite"><span class="icon">…</span><div><div class="headline">Loading…</div></div></div>
 
   <section class="kpis" id="kpis" aria-label="Summary"></section>
@@ -250,6 +297,71 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       <dd>Quotes can move between legs, books are only read at the top level, and some events settle on rules that differ from their titles. Treat this as a screen, not an execution signal. Confirm the rules and live book before trading.</dd>
     </dl>
   </section>
+
+  </div>
+
+  <div class="tab-panel" id="tab-moved" hidden>
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>What moved in the last 24 hours</h2>
+          <p>The biggest repricings, one per event. Each is scored 0–100 for how much it looks like <strong>informed trading</strong> rather than noise, using the features that predicted moves holding in our study of Kalshi trades.</p>
+        </div>
+        <div class="filters">
+          <select id="m-label" aria-label="Signal type">
+            <option value="">All moves</option>
+            <option value="informed">Informed only</option>
+            <option value="mixed">Mixed</option>
+            <option value="noise">Likely noise</option>
+          </select>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="score informed">● 60+</span> Informed: tight spread, heavy volume, many and big trades</span>
+        <span><span class="score mixed">◐ 40–59</span> Mixed</span>
+        <span><span class="score noise">○ &lt;40</span> Likely noise: thin, wide, few trades (tends to revert)</span>
+      </div>
+      <div class="movers" id="movers"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Shark watch: large trades in the last 24 hours</h2>
+          <p id="shark-sub">Trades of 1,000+ contracts in the most active economics markets. In our study these trades were right on average, about +2¢ within an hour, but the edge fades within hours. Treat this as a heads-up, not a delayed copy-trade.</p>
+        </div>
+      </div>
+      <div class="scroll tall"><table id="shark-table"></table></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div><h2>Why these signals? The evidence</h2><p id="research-sub">From <code>python -m kalshi_arb research</code>.</p></div></div>
+      <div class="research" id="research"></div>
+    </section>
+  </div>
+
+  <div class="tab-panel" id="tab-macro" hidden>
+    <section class="gauges" id="gauges" aria-label="Headline expectations"></section>
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Fed funds path implied by Kalshi</h2>
+          <p>Expected upper bound after each FOMC meeting. The line is today's rate plus the expected change at each meeting, from the hike, hold and cut markets. The shaded band is each meeting's own 10–90% range where its rate ladder trades enough. The dashed line shows 24 hours ago.</p>
+        </div>
+      </div>
+      <div class="chart-box" id="fed-chart"></div>
+      <div class="scroll"><table id="fed-table"></table></div>
+    </section>
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Data-release expectations</h2>
+          <p>Market-implied distribution for upcoming releases: median, 10–90% range and the 24-hour shift. Strikes with spreads over 10¢ are ignored.</p>
+        </div>
+      </div>
+      <div class="indicators" id="indicators"></div>
+    </section>
+  </div>
 
   <footer id="footer">Data: Kalshi public market-data API. Not investment advice.</footer>
 </div>
@@ -500,9 +612,191 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     err.style.display = msgs.length ? "block" : "none"; err.textContent = msgs.join(" ");
   }
 
+  // ---------- Tabs ----------
+  function showTab(name) {
+    document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name));
+    document.querySelectorAll(".tab-panel").forEach((p) => { p.hidden = p.id !== "tab-" + name; });
+    try { history.replaceState(null, "", "#" + name); } catch (_) {}
+    if (name === "arb" && state.view === "chart") renderNearChart();
+    if (name === "macro") renderMacro();
+    if (name === "moved") renderMoved();
+  }
+  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+  const agoTs = (ts) => ago(new Date(ts * 1000).toISOString());
+  const signC = (c, d = 1) => (c > 0 ? "+" : c < 0 ? "−" : "") + Math.abs(c).toFixed(d);
+  const LABEL_TXT = { informed: "● Informed", mixed: "◐ Mixed", noise: "○ Likely noise" };
+
+  function sparkSvg(points, moveStart, prevMid) {
+    if (!points || points.length < 2) return "";
+    const W = 300, H = 56, xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+    const x0 = xs[0], x1 = xs[xs.length - 1];
+    let lo = Math.min(...ys), hi = Math.max(...ys); if (hi - lo < 0.02) { const m = (hi + lo) / 2; lo = m - 0.01; hi = m + 0.01; }
+    const X = (t) => (t - x0) / (x1 - x0 || 1) * W, Y = (v) => H - 4 - (v - lo) / (hi - lo) * (H - 8);
+    const d = points.map((p, i) => `${i ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("");
+    const shade = moveStart ? `<rect x="${X(moveStart)}" y="0" width="${W - X(moveStart)}" height="${H}" fill="var(--surface-2)"/>` : "";
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="7-day price, last 24 hours shaded">${shade}<path d="${d}" fill="none" stroke="var(--series-1)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+
+  function renderMoved() {
+    const sig = state.data && state.data.signals;
+    const box = $("#movers");
+    if (!sig) { box.innerHTML = `<div class="empty">No signal data in this scan. Rescan to generate it.</div>`; $("#shark-table").innerHTML = ""; return; }
+    const want = $("#m-label").value;
+    const movers = sig.movers.filter((m) => m.informed && (!want || m.informed.label === want));
+    $("#moved-count").textContent = sig.movers.length ? `(${sig.movers.length})` : "";
+    box.innerHTML = movers.length ? movers.map((m) => {
+      const f = m.features || {}, inf = m.informed, up = m.change > 0;
+      const comps = inf.components.map((c) => `<span title="${esc(c.label)}: ${c.value}. Better than ${Math.round(c.good * 100)}% of past moves">${esc(c.label)}</span><span class="bar"><i style="width:${Math.round(c.good * 100)}%"></i></span>`).join("");
+      const bigs = (m.big_trades || []).slice(0, 3).map((t) => `<div>${t.side === "yes" ? "▲ YES" : "▼ NO"} ${Math.round(t.size).toLocaleString()} @ ${(t.price * 100).toFixed(0)}¢ · ${agoTs(t.ts)}${t.with_move ? "" : " (against move)"}</div>`).join("");
+      const sib = m.siblings ? `<span>Related strikes agreeing <b>${m.siblings_agree}/${m.siblings}</b></span>` : "";
+      const q = encodeURIComponent(m.event_title.replace(/\?$/, ""));
+      return `<article class="mover ${inf.label}">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+          <div><h3>${esc(m.event_title)}</h3><div class="sub">${esc(m.label)} · <span class="tick">${esc(m.ticker)}</span></div></div>
+          <span class="score ${inf.label}" title="Informed-move score">${LABEL_TXT[inf.label]} ${inf.score}</span>
+        </div>
+        <div class="move"><span class="big">${up ? "▲" : "▼"} ${signC(m.change * 100, 0)}¢</span><span class="sub">${(m.prev_mid * 100).toFixed(0)}¢ → ${(m.mid * 100).toFixed(0)}¢ in 24h</span></div>
+        ${sparkSvg(m.sparkline, m.move_start)}
+        <div class="stats">
+          <span>Volume vs normal <b>${f.volume_ratio == null ? "—" : f.volume_ratio.toFixed(1) + "×"}</b></span>
+          <span>Trades <b>${(f.n_trades || 0).toLocaleString()}</b> · <b>${usd(f.notional || 0, 0)}</b></span>
+          <span>From big trades <b>${Math.round((f.big_share || 0) * 100)}%</b></span>
+          <span>Flow with move <b>${f.flow_imbalance == null ? "—" : signC(f.flow_imbalance * 100, 0) + "%"}</b></span>
+          <span>Spread <b>${f.spread == null ? "—" : (f.spread * 100).toFixed(0) + "¢"}</b></span>
+          ${sib}
+        </div>
+        <div class="comp">${comps}</div>
+        ${bigs ? `<div class="trades-mini" title="Largest trades in the last 24h (market's top-decile size)">${bigs}</div>` : ""}
+        <a class="news" href="https://news.google.com/search?q=${q}" target="_blank" rel="noopener">Search news for this ↗</a>
+      </article>`;
+    }).join("") : `<div class="empty"><strong>No moves match</strong>Nothing moved 3¢+ with enough volume in the last 24h.</div>`;
+
+    const cols = [
+      { key: "ts", label: "When", render: (t) => agoTs(t.ts) },
+      { key: "event_title", label: "Market", cls: "event", render: (t) => `${esc(t.event_title)}<div class="tick">${esc(t.label)} · ${esc(t.ticker)}</div>` },
+      { key: "side", label: "Taker bought", render: (t) => t.side === "yes" ? `<span class="badge info">▲ YES</span>` : `<span class="badge info">▼ NO</span>` },
+      { key: "size", label: "Contracts", num: true, render: (t) => Math.round(t.size).toLocaleString() },
+      { key: "price", label: "YES price", num: true, render: (t) => (t.price * 100).toFixed(0) + "¢" },
+      { key: "notional", label: "Paid", num: true, render: (t) => usd(t.notional, 0) },
+      { key: "cents_since", label: "Since, for the taker", num: true, render: (t) => t.cents_since == null ? "—" : `<span class="${t.cents_since > 0 ? "up" : t.cents_since < 0 ? "down" : "flat"}">${signC(t.cents_since)}¢</span>` },
+    ];
+    if (!state.sort.shark) state.sort.shark = ["ts", -1];
+    renderTable($("#shark-table"), "shark", cols, sig.big_trades || [], `<div class="empty">No trades of ${(sig.shark_size || 1000).toLocaleString()}+ contracts in the last 24h.</div>`);
+    renderResearch(sig.model || {});
+  }
+
+  function renderResearch(model) {
+    const el = $("#research");
+    const v = model.validation || {}, mk = model.markouts_cents || [];
+    if (!mk.length) { el.innerHTML = "Run <code>python -m kalshi_arb research</code> to generate the evidence."; return; }
+    const mkRows = mk.map((r) => `<tr><td>${esc(r.bucket)}</td><td class="num">${r.n.toLocaleString()}</td><td class="num">${signC(r["1h"], 2)}¢</td><td class="num">${signC(r["24h"], 2)}¢</td></tr>`).join("");
+    const vRows = ["test", "train"].filter((k) => v[k]).map((k) => ["high", "mid", "low"].map((t) => { const x = v[k][t]; return `<tr><td>${k === "test" ? "<b>Unseen period</b>" : "Fitting period"}</td><td>${t} (${x.score_range[0]}–${x.score_range[1]})</td><td class="num">${x.n}</td><td class="num">${signC(x.mean_cont_24h, 2)}¢</td><td class="num">${x.held_pct}%</td></tr>`; }).join("")).join("");
+    el.innerHTML = `
+      <p>Kalshi's trade tape is anonymous, with no trader IDs, so "sharks" are inferred from <em>how</em> trades behave. The study used ${(model.trades || 0).toLocaleString()} trades in the most active economics markets${model.generated_at ? `, run ${new Date(model.generated_at).toLocaleDateString()}` : ""}.</p>
+      <p><strong>1. Big trades are informed, briefly.</strong> The average price change after each trade, from the taker's side (positive means they were right):</p>
+      <div class="scroll"><table><thead><tr><th>Trade size</th><th class="num">Trades</th><th class="num">+1h</th><th class="num">+24h</th></tr></thead><tbody>${mkRows}</tbody></table></div>
+      <p><strong>2. Most moves partly reverse, and informed-looking ones hold up better, modestly.</strong> The score's weights come from the first half of the period and were tested on the second half, which they never saw.${v.test ? ` On that unseen half, the top-scoring third held ${v.test.high.held_pct}% of the time against ${v.test.low.held_pct}% for the bottom third. The ordering is right, but the gap is within the error bars, and the fitting half looks stronger because it is in-sample. Read the score as "how much to trust a move", not as a trading signal on its own.` : ""}</p>
+      <div class="scroll"><table><thead><tr><th>Sample</th><th>Score third</th><th class="num">Moves</th><th class="num">Next 24h, in move's direction</th><th class="num">Held</th></tr></thead><tbody>${vRows}</tbody></table></div>
+      <p><strong>3. Following big-trade flow a day later didn't pay.</strong> The information gets priced in within hours, so the shark feed is most useful when you're watching live.</p>
+      <p class="tick">Small samples: treat differences under about 1¢ as noise. Full report: <a href="https://github.com/Yakiniku99/GenAI/blob/HEAD/research/informed_flow.md" target="_blank" rel="noopener">research/informed_flow.md</a>.</p>`;
+  }
+
+  // ---------- Expectations ----------
+  const fmtPct = (v, d = 2) => v == null ? "—" : v.toFixed(d) + "%";
+  const bp = (x) => x == null ? "—" : `<span class="${Math.abs(x) < 0.004 ? "flat" : ""}">${signC(x * 100, 1)}bp</span>`;
+  const delta = (x, unit, d) => x == null ? `<span class="flat">—</span>` : `<span class="${Math.abs(x) < 1e-9 ? "flat" : ""}" style="font-weight:600">${signC(x, d)}${unit === "%" ? "pp" : " " + unit}</span>`;
+  const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+
+  function renderMacro() {
+    const mac = state.data && state.data.macro;
+    if (!mac) { $("#gauges").innerHTML = `<div class="empty">No expectations data in this scan.</div>`; return; }
+    const fp = mac.fed_path || { meetings: [] }, ms = fp.meetings.filter((m) => m.expected != null);
+    const next = ms[0];
+    const tiles = [];
+    if (fp.current_upper_bound != null) tiles.push(["Fed funds upper bound (implied today)", fmtPct(fp.current_upper_bound), "anchored on the next meeting's rate ladder"]);
+    if (next) {
+      const top = (next.decision || [])[0];
+      tiles.push([`Expected after ${shortDate(next.date)} FOMC`, fmtPct(next.expected), `${bp(next.expected - next.expected_prev)} in 24h${top ? ` · most likely: ${esc(top.label)} ${Math.round(top.p * 100)}%` : ""}`]);
+    }
+    const last = ms[ms.length - 1];
+    if (last && last !== next) tiles.push([`Expected by ${shortDate(last.date)}`, fmtPct(last.expected), `${bp(last.expected - last.expected_prev)} in 24h`]);
+    for (const g of mac.gauges || []) {
+      if (g.kind === "probability") tiles.push([esc(g.label), Math.round(g.value * 100) + "%", g.prev == null ? "" : `${signC((g.value - g.prev) * 100, 1)} pts in 24h`]);
+      else tiles.push([esc(g.label), g.value.toFixed(2), `expected count · ${g.prev == null ? "" : signC(g.value - g.prev, 2) + " in 24h"}`]);
+    }
+    $("#gauges").innerHTML = tiles.map(([l, v, n]) => `<div class="tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join("");
+    renderFedChart(ms);
+    const rows = fp.meetings.map((m) => {
+      const top = (m.decision || []).slice(0, 3).map((o) => `${esc(o.label)} ${Math.round(o.p * 100)}%`).join(" · ");
+      const lad = m.ladder;
+      return `<tr><td>${new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</td><td class="num"><b>${fmtPct(m.expected)}</b></td><td class="num">${m.expected != null ? bp(m.expected - m.expected_prev) : "—"}</td><td class="num">${m.exp_change == null ? "—" : signC(m.exp_change * 100, 1) + "bp"}</td><td>${top || "—"}</td><td class="num">${!lad ? "—" : lad.low_confidence ? `<span class="tick" title="Too few liquid strikes">thin</span>` : !ladderOk(m) ? `<span class="tick" title="Ladder mean ${fmtPct(lad.mean)} disagrees with the decision markets; its strikes are too patchy to trust">patchy</span>` : `${fmtPct(lad.p10)}–${fmtPct(lad.p90)}`}</td></tr>`;
+    }).join("");
+    $("#fed-table").innerHTML = `<thead><tr><th>Meeting</th><th class="num">Expected rate</th><th class="num">24h change</th><th class="num">Expected move at meeting</th><th>Decision odds</th><th class="num">10–90% (ladder)</th></tr></thead><tbody>${rows}</tbody>`;
+
+    $("#indicators").innerHTML = (mac.indicators || []).map((d) => {
+      const dec = d.decimals, unit = d.unit, u = unit === "%" ? "%" : " " + unit;
+      const fmt = (v) => v == null ? "—" : v.toFixed(dec) + u;
+      const ch = d.change_24h ? d.change_24h.median : null;
+      const bars = d.buckets.filter((b) => b.p > 0.002);
+      const maxP = Math.max(...bars.map((b) => b.p), 0.01), bw = 300 / Math.max(bars.length, 1);
+      const hist = bars.map((b, i) => { const h = Math.max(b.p / maxP * 46, 1); return `<rect x="${i * bw + 1}" y="${54 - h}" width="${Math.max(bw - 2, 1)}" height="${h}" rx="2" fill="var(--series-1)"><title>${b.lo == null ? "≤ " + b.hi : b.hi == null ? "> " + b.lo : b.lo + " – " + b.hi}: ${Math.round(b.p * 100)}%</title></rect>`; }).join("");
+      return `<div class="ind">
+        <div class="t">${esc(d.label)} · ${esc(d.title)}</div>
+        <div class="v">${fmt(d.median)}</div>
+        <div class="r">10–90%: ${fmt(d.p10)} to ${fmt(d.p90)} · 24h: ${delta(ch, unit, dec)}${d.low_confidence ? ` · <span class="badge warn" title="Few liquid strikes or much probability outside them">⚠ thin</span>` : ""}</div>
+        <svg viewBox="0 0 300 54" preserveAspectRatio="none" role="img" aria-label="Implied distribution">${hist}</svg>
+        <div class="r">Resolves ${date(d.resolves)} · 24h volume ${Math.round(d.volume_24h).toLocaleString()}</div>
+      </div>`;
+    }).join("") || `<div class="empty">No liquid release markets found.</div>`;
+  }
+
+  // A meeting's own rate ladder is only shown when it's liquid and agrees with the decision markets.
+  const ladderOk = (m) => m.ladder && !m.ladder.low_confidence && m.expected != null && Math.abs(m.ladder.mean - m.expected) <= 0.15;
+
+  function renderFedChart(ms) {
+    const box = $("#fed-chart");
+    if (ms.length < 2) { box.innerHTML = `<div class="empty">Not enough Fed meeting markets.</div>`; return; }
+    const W = Math.max(box.clientWidth - 32, 300), H = 260, L = 48, R = 16, T = 12, B = 34;
+    const band = ms.map((m) => ladderOk(m) ? [m.ladder.p10, m.ladder.p90] : null);
+    const vals = ms.flatMap((m, i) => [m.expected, m.expected_prev, ...(band[i] || [])]).filter((v) => v != null);
+    let lo = Math.min(...vals), hi = Math.max(...vals); const pad = Math.max((hi - lo) * 0.15, 0.1); lo -= pad; hi += pad;
+    const X = (i) => L + i / (ms.length - 1) * (W - L - R), Y = (v) => T + (hi - v) / (hi - lo) * (H - T - B);
+    const ticks = niceTicks(lo, hi, 5);
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Implied Fed funds path">`;
+    ticks.forEach((t) => { s += `<line x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--grid)"/><text x="${L - 6}" y="${Y(t) + 4}" text-anchor="end">${t.toFixed(2)}%</text>`; });
+    // band (only contiguous confident meetings)
+    let seg = [];
+    const flush = () => { if (seg.length > 1) s += `<path d="${seg.map(([i, b], k) => `${k ? "L" : "M"}${X(i)},${Y(b[1])}`).join("")}${seg.slice().reverse().map(([i, b]) => `L${X(i)},${Y(b[0])}`).join("")}Z" fill="var(--series-1)" opacity="0.13"/>`; seg = []; };
+    band.forEach((b, i) => { if (b) seg.push([i, b]); else flush(); }); flush();
+    const line = (key) => ms.map((m, i) => `${i ? "L" : "M"}${X(i)},${Y(m[key])}`).join("");
+    s += `<path d="${line("expected_prev")}" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+    s += `<path d="${line("expected")}" fill="none" stroke="var(--series-1)" stroke-width="2.5"/>`;
+    ms.forEach((m, i) => {
+      s += `<circle cx="${X(i)}" cy="${Y(m.expected)}" r="4.5" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2"/>`;
+      s += `<text x="${X(i)}" y="${H - 12}" text-anchor="middle">${shortDate(m.date)}</text>`;
+      s += `<rect class="hit" data-i="${i}" x="${X(i) - (W - L - R) / (ms.length - 1) / 2}" y="${T}" width="${(W - L - R) / (ms.length - 1)}" height="${H - T - B}" fill="transparent"/>`;
+    });
+    const lastI = ms.length - 1;
+    s += `<text x="${X(lastI) - 6}" y="${Y(ms[lastI].expected) - 10}" text-anchor="end" class="bar-label">${fmtPct(ms[lastI].expected)}</text>`;
+    box.innerHTML = s + `</svg><div class="legend" style="padding:6px 0 0"><span><i style="background:var(--series-1)"></i>Expected now</span><span><i style="background:var(--text-muted)"></i>24h ago (dashed)</span><span><i style="background:var(--series-1);opacity:.25"></i>10–90% where the ladder trades enough</span></div>`;
+    const tip = $("#tooltip");
+    box.querySelectorAll(".hit").forEach((h) => {
+      h.addEventListener("mousemove", (e) => {
+        const m = ms[+h.dataset.i];
+        tip.innerHTML = `<b>${new Date(m.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} FOMC</b>Expected upper bound ${fmtPct(m.expected)} (${bp(m.expected - m.expected_prev)} in 24h)<br>${(m.decision || []).slice(0, 4).map((o) => `${esc(o.label)}: ${Math.round(o.p * 100)}%`).join("<br>")}`;
+        tip.style.display = "block";
+        tip.style.left = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8) + window.scrollX + "px"; tip.style.top = e.clientY + window.scrollY + 14 + "px";
+      });
+      h.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+    });
+  }
+  $("#m-label").addEventListener("input", renderMoved);
+
   function render() {
     renderKpis(); renderArbs(); renderMe();
     if (state.view === "chart") renderNearChart(); else renderNearTable();
+    renderMoved(); renderMacro();
     if (state.data) {
       const fm = state.data.fee_model || { label: "Kalshi direct", description: "7% × P × (1−P) taker fee × series multiplier, per order" };
       $("#fee-label").textContent = `${fm.label} fees`;
@@ -590,7 +884,9 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     try { await fetch("api/refresh", { method: "POST" }); } catch (_) {}
     setTimeout(poll, 500);
   });
-  let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => state.view === "chart" && renderNearChart(), 150); });
+  let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (state.view === "chart") renderNearChart(); renderMacro(); }, 150); });
+  const initial = (location.hash || "").slice(1);
+  if (["arb", "moved", "macro"].includes(initial)) showTab(initial);
   poll();
 })();
 </script>

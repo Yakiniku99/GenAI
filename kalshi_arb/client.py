@@ -100,6 +100,26 @@ class KalshiClient:
         trades = self.get("/markets/trades", {"ticker": ticker, "limit": 1}).get("trades") or []
         return trades[0].get("created_time") if trades else None
 
+    def candlesticks(self, series_ticker: str, ticker: str, start_ts: int, end_ts: int,
+                     period_minutes: int = 60) -> list[dict]:
+        path = f"/series/{urllib.parse.quote(series_ticker)}/markets/{urllib.parse.quote(ticker)}/candlesticks"
+        return self.get(path, {"start_ts": start_ts, "end_ts": end_ts,
+                               "period_interval": period_minutes}).get("candlesticks") or []
+
+    def trades(self, ticker: str, min_ts: int | None = None, max_ts: int | None = None,
+               max_pages: int = 20) -> list[dict]:
+        """Trades newest first, up to max_pages x 1000."""
+        out: list[dict] = []
+        cursor = None
+        for _ in range(max_pages):
+            page = self.get("/markets/trades", {"ticker": ticker, "min_ts": min_ts, "max_ts": max_ts,
+                                                "limit": 1000, "cursor": cursor})
+            out += page.get("trades") or []
+            cursor = page.get("cursor")
+            if not cursor or not page.get("trades"):
+                break
+        return out
+
     def open_events_with_markets(self, series_ticker: str) -> list[dict]:
         return list(self.paginate(
             "/events", "events",

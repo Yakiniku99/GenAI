@@ -34,6 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     common.add_argument("--workers", type=int, default=10)
     common.add_argument("--fees", choices=sorted(FEE_MODELS), default=DEFAULT_FEE_MODEL,
                         help="Fee schedule to net out: robinhood (default, no Gold), robinhood-gold, or kalshi (direct)")
+    common.add_argument("--no-signals", dest="signals", action="store_false",
+                        help="Skip the What moved / shark-watch signals (fewer API calls)")
     common.add_argument("--depth", type=int, default=40, metavar="N",
                         help="Read full order books for the N best candidates (default: 40, 0 to skip)")
 
@@ -55,10 +57,21 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser("build", parents=[common], help="Scan once and write a static site (for GitHub Pages etc.)")
     b.add_argument("-o", "--out", default="_site", help="Output folder (default: _site)")
 
+    r = sub.add_parser("research", help="Study which moves and trade sizes carry information (writes research/)")
+    r.add_argument("--markets", type=int, default=60, help="Most active markets to study (default: 60)")
+    r.add_argument("--days", type=int, default=14, help="Days of trade history (default: 14)")
+    r.add_argument("--out", default="research")
+    r.add_argument("--cache", help="Pickle the fetched data here and reuse it on later runs")
+
     a = p.parse_args(argv)
 
+    if a.cmd == "research":
+        from .research import run
+        run(a.markets, a.days, a.out, cache=a.cache)
+        return 0
+
     if a.cmd == "scan":
-        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth)
+        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals)
         if a.out:
             with open(a.out, "w") as f:
                 json.dump(snap, f, indent=1)
@@ -77,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "build":
         from .server import build_static_site
-        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth)
+        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals)
         build_static_site(snap, a.out)
         print(f"wrote static dashboard to {a.out}/ ({snap['markets_scanned']} markets)", file=sys.stderr)
         return 0

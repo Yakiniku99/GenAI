@@ -1,8 +1,16 @@
-# Kalshi Economics Arbitrage Dashboard
+# Kalshi Economics Signals
 
-A live dashboard that scans every open **Economics** market on [Kalshi](https://kalshi.com)
-and flags baskets of contracts whose *guaranteed* settlement payout is worth more than
-what they cost to buy right now, after trading fees. **Fees default to Robinhood's schedule**
+A live dashboard over every open **Economics** market on [Kalshi](https://kalshi.com), with three views:
+
+* **Arbitrage**: baskets of contracts whose *guaranteed* settlement payout is worth more than
+  what they cost to buy right now, after trading fees.
+* **What moved**: the biggest 24h repricings, each scored for whether it looks like **informed
+  trading or noise**, plus a "shark watch" feed of large trades. The score is backed by a study of
+  Kalshi's own trade tape (see [Informed-flow research](#informed-flow-research)).
+* **Expectations**: the Fed funds path, CPI, payrolls, unemployment and GDP as market-implied
+  distributions, with 24h shifts and recession and rate-cut gauges.
+
+ **Fees default to Robinhood's schedule**
 (for trading Kalshi contracts through Robinhood); Robinhood Gold and Kalshi-direct are also available.
 
 Pure Python standard library, so there's nothing to `pip install` (Python 3.10+). It uses only Kalshi's public
@@ -131,6 +139,55 @@ python -m kalshi_arb serve --snapshot snapshot.json
 A full scan of all ~870 Economics series takes about 2 minutes at the default 12 requests/sec. Use `--rate`
 and `--workers` to tune it. Kalshi rate-limits aggressive clients, and the client backs off on HTTP 429.
 
+## What moved: informed flow vs noise
+
+Kalshi's trade tape is anonymous: every trade shows size, price and which side crossed the spread,
+but not who placed it. So "sharks" have to be inferred from *how* trades behave. Each 24h mover
+(at least 3¢ and 50 contracts, one per event) is scored 0–100 on the features that, in the study,
+separated moves that held from moves that reversed:
+
+| Feature | Informed end |
+|---|---|
+| Bid-ask spread | tight |
+| Volume vs the market's normal hourly rate | high |
+| Number of trades | many |
+| Share of volume from big trades (the market's own top decile, ≥25 contracts) | high |
+
+Each feature is converted to a percentile against past moves and weighted by how strongly it
+predicted continuation. Features whose gap was under 0.5¢ are dropped. Buyer-vs-seller imbalance,
+path retention and big-trade direction were tested and didn't predict anything. **60+ = informed, 40–59 = mixed, under 40 = likely noise.** The score is
+fitted on the first half of the study period and checked on the second half.
+
+**Shark watch** lists trades of 1,000+ contracts in the 40 most active markets and the movers,
+with how the price has moved since, from the taker's side.
+
+## Expectations
+
+* **Fed path**: expected upper bound after each FOMC meeting. This is today's rate plus the running
+  sum of expected changes from the hike, hold and cut markets (expectations add up whatever the
+  correlation between meetings). Today's rate is anchored on the next meeting's rate ladder.
+  Each meeting's own "above X%" ladder supplies a 10–90% band, shown only where it is liquid and
+  agrees with the decision markets.
+* **Release distributions**: each "above X" ladder is a probability distribution. Strikes with
+  spreads over 10¢ are dropped, the curve is forced to be monotone (pool-adjacent-violators), and
+  the median, 10–90% range, mean and most likely bucket are derived from it. 24h changes compare the
+  same strikes now and 24h ago. Cards are flagged **thin** when fewer than 5 strikes trade or more than
+  15% of the probability falls outside them.
+
+## Informed-flow research
+
+```bash
+python -m kalshi_arb research --markets 60 --days 14
+```
+
+This pulls trades and hourly prices for the most active economics markets and writes
+[`research/informed_flow.md`](research/informed_flow.md). It runs three tests: (1) taker
+results by trade size, (2) which move features predict a move holding, and (3) whether following
+big-trade flow pays a day later. It also refits the score weights in `kalshi_arb/informed_model.json`.
+Background: permanent price impact signals information and transitory impact signals liquidity
+(Hasbrouck 1991), and per-market leakage and order-flow-skill measures have been applied to
+Polymarket (arXiv 2605.02287).
+
 ## Layout
 
 ```
@@ -138,9 +195,14 @@ kalshi_arb/
   client.py      rate-limited Kalshi REST client with retries
   arbitrage.py   fee model + detection strategies (pure functions)
   scanner.py     fetches series → open events/markets → opportunities snapshot
+  flow.py        trade/candle parsing and move features
+  signals.py     "What moved" movers, informed-move score, shark-watch feed
+  macro.py       implied distributions, Fed path, gauges
+  research.py    the informed-flow study (writes research/ and informed_model.json)
   server.py      stdlib HTTP server + background rescan loop
   static/index.html  the dashboard (no external dependencies)
-tests/test_arbitrage.py
+research/informed_flow.md   latest study results
+tests/
 ```
 
 ```bash

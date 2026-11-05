@@ -1,0 +1,1193 @@
+{
+ "generated_at": "2026-11-05T01:26:16.322566+00:00",
+ "params": {
+  "markets": 60,
+  "days": 14,
+  "move_window_h": 6,
+  "move_min_cents": 3.0,
+  "forward_h": 24
+ },
+ "trades": 18687,
+ "markouts_cents": [
+  {
+   "bucket": "<10",
+   "1h": -0.51,
+   "1h_se": 0.04,
+   "1h_w": -0.43,
+   "n": 6334,
+   "6h": 0.01,
+   "6h_se": 0.07,
+   "6h_w": 0.1,
+   "24h": -0.57,
+   "24h_se": 0.11,
+   "24h_w": -0.52,
+   "markets": 59
+  },
+  {
+   "bucket": "10-99",
+   "1h": -0.12,
+   "1h_se": 0.04,
+   "1h_w": -0.08,
+   "n": 4937,
+   "6h": 0.63,
+   "6h_se": 0.09,
+   "6h_w": 0.93,
+   "24h": 0.34,
+   "24h_se": 0.11,
+   "24h_w": 0.19,
+   "markets": 56
+  },
+  {
+   "bucket": "100-999",
+   "1h": 0.37,
+   "1h_se": 0.09,
+   "1h_w": 0.63,
+   "n": 1597,
+   "6h": 0.84,
+   "6h_se": 0.16,
+   "6h_w": 0.71,
+   "24h": 0.45,
+   "24h_se": 0.2,
+   "24h_w": 0.74,
+   "markets": 60
+  },
+  {
+   "bucket": "1,000+",
+   "1h": 2.06,
+   "1h_se": 0.22,
+   "1h_w": 1.22,
+   "n": 383,
+   "6h": 1.65,
+   "6h_se": 0.35,
+   "6h_w": 1.06,
+   "24h": 1.37,
+   "24h_se": 0.48,
+   "24h_w": 1.45,
+   "markets": 52
+  }
+ ],
+ "moves": {
+  "n": 213,
+  "mean_cont_24h": -2.92,
+  "held_pct": 44.6
+ },
+ "feature_terciles": [
+  {
+   "feature": "sibling_confirmation",
+   "n": 51,
+   "low": {
+    "range": [
+     0.0,
+     0.0
+    ],
+    "mean_cont_24h": -3.06,
+    "se": 1.58,
+    "held_pct": 29.4
+   },
+   "mid": {
+    "range": [
+     0.0,
+     1.0
+    ],
+    "mean_cont_24h": -4.68,
+    "se": 2.82,
+    "held_pct": 52.9
+   },
+   "high": {
+    "range": [
+     1.0,
+     1.0
+    ],
+    "mean_cont_24h": -10.62,
+    "se": 3.14,
+    "held_pct": 11.8
+   },
+   "high_minus_low": -7.56
+  },
+  {
+   "feature": "spread",
+   "n": 213,
+   "low": {
+    "range": [
+     0.009999999999999981,
+     0.019999999999999962
+    ],
+    "mean_cont_24h": -1.48,
+    "se": 0.78,
+    "held_pct": 57.7
+   },
+   "mid": {
+    "range": [
+     0.019999999999999962,
+     0.039999999999999925
+    ],
+    "mean_cont_24h": -2.86,
+    "se": 1.21,
+    "held_pct": 39.4
+   },
+   "high": {
+    "range": [
+     0.039999999999999925,
+     0.6
+    ],
+    "mean_cont_24h": -4.42,
+    "se": 1.03,
+    "held_pct": 36.6
+   },
+   "high_minus_low": -2.94
+  },
+  {
+   "feature": "n_trades",
+   "n": 213,
+   "low": {
+    "range": [
+     0,
+     0
+    ],
+    "mean_cont_24h": -4.27,
+    "se": 1.31,
+    "held_pct": 43.7
+   },
+   "mid": {
+    "range": [
+     0,
+     11
+    ],
+    "mean_cont_24h": -2.25,
+    "se": 0.88,
+    "held_pct": 43.7
+   },
+   "high": {
+    "range": [
+     12,
+     119
+    ],
+    "mean_cont_24h": -2.25,
+    "se": 0.82,
+    "held_pct": 46.5
+   },
+   "high_minus_low": 2.02
+  },
+  {
+   "feature": "volume_ratio",
+   "n": 208,
+   "low": {
+    "range": [
+     0.0,
+     0.0
+    ],
+    "mean_cont_24h": -4.01,
+    "se": 1.31,
+    "held_pct": 44.9
+   },
+   "mid": {
+    "range": [
+     0.0,
+     1.39
+    ],
+    "mean_cont_24h": -2.85,
+    "se": 1.01,
+    "held_pct": 42.0
+   },
+   "high": {
+    "range": [
+     1.44,
+     1276.15
+    ],
+    "mean_cont_24h": -2.06,
+    "se": 0.77,
+    "held_pct": 45.7
+   },
+   "high_minus_low": 1.95
+  },
+  {
+   "feature": "big_share",
+   "n": 213,
+   "low": {
+    "range": [
+     0.0,
+     0.0
+    ],
+    "mean_cont_24h": -3.7,
+    "se": 1.32,
+    "held_pct": 46.5
+   },
+   "mid": {
+    "range": [
+     0.0,
+     0.0
+    ],
+    "mean_cont_24h": -2.8,
+    "se": 0.86,
+    "held_pct": 39.4
+   },
+   "high": {
+    "range": [
+     0.0,
+     1.0
+    ],
+    "mean_cont_24h": -2.25,
+    "se": 0.84,
+    "held_pct": 47.9
+   },
+   "high_minus_low": 1.45
+  },
+  {
+   "feature": "flow_imbalance",
+   "n": 213,
+   "low": {
+    "range": [
+     -1.0,
+     0.0
+    ],
+    "mean_cont_24h": -2.91,
+    "se": 1.18,
+    "held_pct": 46.5
+   },
+   "mid": {
+    "range": [
+     0.0,
+     0.949
+    ],
+    "mean_cont_24h": -4.02,
+    "se": 0.96,
+    "held_pct": 36.6
+   },
+   "high": {
+    "range": [
+     0.95,
+     1.0
+    ],
+    "mean_cont_24h": -1.83,
+    "se": 0.93,
+    "held_pct": 50.7
+   },
+   "high_minus_low": 1.08
+  },
+  {
+   "feature": "retention",
+   "n": 213,
+   "low": {
+    "range": [
+     0.471,
+     1.0
+    ],
+    "mean_cont_24h": -2.1,
+    "se": 0.98,
+    "held_pct": 45.1
+   },
+   "mid": {
+    "range": [
+     1.0,
+     1.0
+    ],
+    "mean_cont_24h": -4.15,
+    "se": 1.28,
+    "held_pct": 46.5
+   },
+   "high": {
+    "range": [
+     1.0,
+     1.0
+    ],
+    "mean_cont_24h": -2.51,
+    "se": 0.76,
+    "held_pct": 42.3
+   },
+   "high_minus_low": -0.41
+  },
+  {
+   "feature": "big_with_share",
+   "n": 69,
+   "low": {
+    "range": [
+     0.0,
+     0.963
+    ],
+    "mean_cont_24h": -2.09,
+    "se": 1.24,
+    "held_pct": 43.5
+   },
+   "mid": {
+    "range": [
+     0.972,
+     1.0
+    ],
+    "mean_cont_24h": -2.67,
+    "se": 1.93,
+    "held_pct": 47.8
+   },
+   "high": {
+    "range": [
+     1.0,
+     1.0
+    ],
+    "mean_cont_24h": -2.2,
+    "se": 1.29,
+    "held_pct": 47.8
+   },
+   "high_minus_low": -0.11
+  }
+ ],
+ "moves_24h": {
+  "n": 196,
+  "feature_terciles": [
+   {
+    "feature": "volume_ratio",
+    "n": 189,
+    "low": {
+     "range": [
+      0.0,
+      0.03
+     ],
+     "mean_cont_24h": -3.57,
+     "se": 1.19,
+     "held_pct": 50.8
+    },
+    "mid": {
+     "range": [
+      0.04,
+      1.22
+     ],
+     "mean_cont_24h": -0.71,
+     "se": 0.53,
+     "held_pct": 39.7
+    },
+    "high": {
+     "range": [
+      1.27,
+      319.04
+     ],
+     "mean_cont_24h": 0.57,
+     "se": 0.67,
+     "held_pct": 55.6
+    },
+    "high_minus_low": 4.14
+   },
+   {
+    "feature": "n_trades",
+    "n": 196,
+    "low": {
+     "range": [
+      0,
+      2
+     ],
+     "mean_cont_24h": -3.68,
+     "se": 1.15,
+     "held_pct": 47.7
+    },
+    "mid": {
+     "range": [
+      2,
+      23
+     ],
+     "mean_cont_24h": 0.35,
+     "se": 0.65,
+     "held_pct": 50.8
+    },
+    "high": {
+     "range": [
+      23,
+      378
+     ],
+     "mean_cont_24h": -0.32,
+     "se": 0.52,
+     "held_pct": 48.5
+    },
+    "high_minus_low": 3.36
+   },
+   {
+    "feature": "spread",
+    "n": 196,
+    "low": {
+     "range": [
+      0.009999999999999898,
+      0.010000000000000009
+     ],
+     "mean_cont_24h": 0.3,
+     "se": 0.44,
+     "held_pct": 64.6
+    },
+    "mid": {
+     "range": [
+      0.010000000000000009,
+      0.030000000000000027
+     ],
+     "mean_cont_24h": -1.74,
+     "se": 0.75,
+     "held_pct": 43.1
+    },
+    "high": {
+     "range": [
+      0.030000000000000027,
+      0.6
+     ],
+     "mean_cont_24h": -2.19,
+     "se": 1.15,
+     "held_pct": 39.4
+    },
+    "high_minus_low": -2.49
+   },
+   {
+    "feature": "big_share",
+    "n": 196,
+    "low": {
+     "range": [
+      0.0,
+      0.0
+     ],
+     "mean_cont_24h": -2.26,
+     "se": 0.79,
+     "held_pct": 49.2
+    },
+    "mid": {
+     "range": [
+      0.0,
+      0.533
+     ],
+     "mean_cont_24h": -1.46,
+     "se": 1.11,
+     "held_pct": 43.1
+    },
+    "high": {
+     "range": [
+      0.538,
+      1.0
+     ],
+     "mean_cont_24h": 0.06,
+     "se": 0.5,
+     "held_pct": 54.5
+    },
+    "high_minus_low": 2.32
+   },
+   {
+    "feature": "sibling_confirmation",
+    "n": 49,
+    "low": {
+     "range": [
+      0.0,
+      0.0
+     ],
+     "mean_cont_24h": -1.69,
+     "se": 0.58,
+     "held_pct": 37.5
+    },
+    "mid": {
+     "range": [
+      0.0,
+      1.0
+     ],
+     "mean_cont_24h": -0.88,
+     "se": 1.91,
+     "held_pct": 62.5
+    },
+    "high": {
+     "range": [
+      1.0,
+      1.0
+     ],
+     "mean_cont_24h": -3.65,
+     "se": 1.44,
+     "held_pct": 29.4
+    },
+    "high_minus_low": -1.96
+   },
+   {
+    "feature": "retention",
+    "n": 196,
+    "low": {
+     "range": [
+      0.243,
+      0.963
+     ],
+     "mean_cont_24h": -0.94,
+     "se": 0.73,
+     "held_pct": 47.7
+    },
+    "mid": {
+     "range": [
+      1.0,
+      1.0
+     ],
+     "mean_cont_24h": -2.6,
+     "se": 0.99,
+     "held_pct": 43.1
+    },
+    "high": {
+     "range": [
+      1.0,
+      1.0
+     ],
+     "mean_cont_24h": -0.12,
+     "se": 0.77,
+     "held_pct": 56.1
+    },
+    "high_minus_low": 0.82
+   },
+   {
+    "feature": "flow_imbalance",
+    "n": 196,
+    "low": {
+     "range": [
+      -1.0,
+      0.0
+     ],
+     "mean_cont_24h": -0.95,
+     "se": 0.72,
+     "held_pct": 50.8
+    },
+    "mid": {
+     "range": [
+      0.0,
+      0.625
+     ],
+     "mean_cont_24h": -2.05,
+     "se": 0.76,
+     "held_pct": 43.1
+    },
+    "high": {
+     "range": [
+      0.632,
+      1.0
+     ],
+     "mean_cont_24h": -0.65,
+     "se": 1.01,
+     "held_pct": 53.0
+    },
+    "high_minus_low": 0.3
+   },
+   {
+    "feature": "big_with_share",
+    "n": 88,
+    "low": {
+     "range": [
+      0.0,
+      0.64
+     ],
+     "mean_cont_24h": 0.07,
+     "se": 0.75,
+     "held_pct": 51.7
+    },
+    "mid": {
+     "range": [
+      0.647,
+      1.0
+     ],
+     "mean_cont_24h": -0.64,
+     "se": 0.76,
+     "held_pct": 37.9
+    },
+    "high": {
+     "range": [
+      1.0,
+      1.0
+     ],
+     "mean_cont_24h": -0.1,
+     "se": 0.61,
+     "held_pct": 60.0
+    },
+    "high_minus_low": -0.17
+   }
+  ]
+ },
+ "score_validation": {
+  "train": {
+   "low": {
+    "score_range": [
+     19,
+     42
+    ],
+    "n": 32,
+    "mean_cont_24h": -5.11,
+    "se": 2.03,
+    "held_pct": 34.4
+   },
+   "mid": {
+    "score_range": [
+     43,
+     72
+    ],
+    "n": 32,
+    "mean_cont_24h": -2.23,
+    "se": 1.05,
+    "held_pct": 31.2
+   },
+   "high": {
+    "score_range": [
+     72,
+     92
+    ],
+    "n": 34,
+    "mean_cont_24h": 0.1,
+    "se": 0.48,
+    "held_pct": 70.6
+   }
+  },
+  "test": {
+   "low": {
+    "score_range": [
+     19,
+     47
+    ],
+    "n": 32,
+    "mean_cont_24h": -0.58,
+    "se": 1.33,
+    "held_pct": 46.9
+   },
+   "mid": {
+    "score_range": [
+     49,
+     79
+    ],
+    "n": 32,
+    "mean_cont_24h": -0.3,
+    "se": 0.69,
+    "held_pct": 53.1
+   },
+   "high": {
+    "score_range": [
+     80,
+     93
+    ],
+    "n": 34,
+    "mean_cont_24h": 0.63,
+    "se": 0.71,
+    "held_pct": 55.9
+   }
+  }
+ },
+ "score_model": {
+  "volume_ratio": {
+   "weight": 4.14,
+   "quantiles": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.01,
+    0.05,
+    0.12,
+    0.35,
+    0.49,
+    0.67,
+    0.93,
+    1.17,
+    1.5,
+    2.46,
+    3.39,
+    5.13,
+    6.46,
+    11.59
+   ]
+  },
+  "n_trades": {
+   "weight": 3.36,
+   "quantiles": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    2,
+    5,
+    8,
+    12,
+    14,
+    18,
+    22,
+    26,
+    32,
+    38,
+    61,
+    102,
+    192
+   ]
+  },
+  "spread": {
+   "weight": -2.49,
+   "quantiles": [
+    0.009999999999999981,
+    0.010000000000000009,
+    0.010000000000000009,
+    0.010000000000000009,
+    0.010000000000000009,
+    0.010000000000000009,
+    0.010000000000000009,
+    0.01999999999999999,
+    0.020000000000000018,
+    0.020000000000000018,
+    0.020000000000000018,
+    0.029999999999999916,
+    0.030000000000000013,
+    0.030000000000000027,
+    0.04000000000000001,
+    0.040000000000000036,
+    0.05999999999999994,
+    0.07000000000000006,
+    0.10999999999999999
+   ]
+  },
+  "big_share": {
+   "weight": 2.32,
+   "quantiles": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.395,
+    0.51,
+    0.564,
+    0.627,
+    0.729,
+    0.79,
+    0.859,
+    0.908
+   ]
+  }
+ },
+ "flow_signal": [
+  {
+   "flow": "big",
+   "net_notional": "smallest third",
+   "range_usd": [
+    3,
+    187
+   ],
+   "n": 197,
+   "mean_fwd_24h": -0.8,
+   "se": 0.42,
+   "hit_pct": 42.6
+  },
+  {
+   "flow": "big",
+   "net_notional": "middle third",
+   "range_usd": [
+    187,
+    950
+   ],
+   "n": 197,
+   "mean_fwd_24h": 0.46,
+   "se": 0.49,
+   "hit_pct": 46.7
+  },
+  {
+   "flow": "big",
+   "net_notional": "largest third",
+   "range_usd": [
+    950,
+    31164
+   ],
+   "n": 198,
+   "mean_fwd_24h": -0.86,
+   "se": 0.56,
+   "hit_pct": 37.9
+  },
+  {
+   "flow": "small",
+   "net_notional": "smallest third",
+   "range_usd": [
+    1,
+    25
+   ],
+   "n": 371,
+   "mean_fwd_24h": -1.01,
+   "se": 0.38,
+   "hit_pct": 28.0
+  },
+  {
+   "flow": "small",
+   "net_notional": "middle third",
+   "range_usd": [
+    25,
+    160
+   ],
+   "n": 371,
+   "mean_fwd_24h": -0.25,
+   "se": 0.33,
+   "hit_pct": 39.1
+  },
+  {
+   "flow": "small",
+   "net_notional": "largest third",
+   "range_usd": [
+    161,
+    7363
+   ],
+   "n": 372,
+   "mean_fwd_24h": -0.39,
+   "se": 0.36,
+   "hit_pct": 41.9
+  }
+ ],
+ "universe": [
+  {
+   "ticker": "KXAAAGASD-26NOV05-4.1000",
+   "title": "US gas prices tomorrow",
+   "label": "Above 4.1000",
+   "volume_24h": 106261.11
+  },
+  {
+   "ticker": "KXFEDDECISION-26DEC-H25",
+   "title": "Fed decision in Dec 2026?",
+   "label": "Hike 25bps",
+   "volume_24h": 73858.76
+  },
+  {
+   "ticker": "KXFED-26DEC-T4.00",
+   "title": "Fed funds rate after Dec 2026 meeting?",
+   "label": "Above 4.00%",
+   "volume_24h": 64647.59
+  },
+  {
+   "ticker": "KXAAAGASW-26NOV09-4.0400",
+   "title": "US gas prices this week",
+   "label": "Above 4.0400",
+   "volume_24h": 50940.97
+  },
+  {
+   "ticker": "KXAAAGASW-26NOV09-4.0200",
+   "title": "US gas prices this week",
+   "label": "Above 4.0200",
+   "volume_24h": 46378.25
+  },
+  {
+   "ticker": "KXFEDDECISION-26DEC-H0",
+   "title": "Fed decision in Dec 2026?",
+   "label": "Fed maintains rate",
+   "volume_24h": 43703.24
+  },
+  {
+   "ticker": "KXRECSSNBER-27",
+   "title": "Recession in 2027?",
+   "label": "Yes",
+   "volume_24h": 35292.72
+  },
+  {
+   "ticker": "KXDIESELD-26NOV05-T6.260",
+   "title": "Diesel prices tomorrow",
+   "label": "Above $6.260",
+   "volume_24h": 19646.47
+  },
+  {
+   "ticker": "KXDIESELD-26NOV05-T6.255",
+   "title": "Diesel prices tomorrow",
+   "label": "Above $6.255",
+   "volume_24h": 16239.73
+  },
+  {
+   "ticker": "KXCBDECISIONMEXICO-26NOV05-C25",
+   "title": "Bank of Mexico rate decision in November",
+   "label": "Cut 25bps",
+   "volume_24h": 15472.93
+  },
+  {
+   "ticker": "KXAAAGASMINM-26NOV30-3.50",
+   "title": "How low will US gas prices get in Nov 2026?",
+   "label": "Below $3.50",
+   "volume_24h": 13298.59
+  },
+  {
+   "ticker": "KXCPI-26OCT-T0.1",
+   "title": "CPI in October",
+   "label": "Above 0.1%",
+   "volume_24h": 11930.95
+  },
+  {
+   "ticker": "KXDIESELW-26NOV09-T6.14",
+   "title": "Diesel prices this week",
+   "label": "Above $6.14",
+   "volume_24h": 10837.26
+  },
+  {
+   "ticker": "KXAAAGASM-26NOV30-3.90",
+   "title": "Gas prices in the US in Nov 2026?",
+   "label": "Above 3.90",
+   "volume_24h": 10758.26
+  },
+  {
+   "ticker": "KXORSEMICONEMP-27MAR31-T26400",
+   "title": "Will Oregon semiconductor manufacturing jobs rise YoY?",
+   "label": "Above 26,400 jobs",
+   "volume_24h": 9412.45
+  },
+  {
+   "ticker": "KXBRRATECUT-27JAN01-T7",
+   "title": "Number of Brazil rate cuts in 2026?",
+   "label": "7 or more cuts",
+   "volume_24h": 7558.0
+  },
+  {
+   "ticker": "KXMELOBSTER-27MAR31-T85",
+   "title": "Maine lobster landings in 2026",
+   "label": "Above 85 million pounds",
+   "volume_24h": 7554.75
+  },
+  {
+   "ticker": "KXFLVISITORCOUNT-27FEB26-T144",
+   "title": "Visitors to Florida in 2026",
+   "label": "Above 144 million",
+   "volume_24h": 7093.84
+  },
+  {
+   "ticker": "KXAAAGASM-26NOV30-4.00",
+   "title": "Gas prices in the US in Nov 2026?",
+   "label": "Above 4.00",
+   "volume_24h": 6944.41
+  },
+  {
+   "ticker": "KXDIESELW-26NOV09-T6.12",
+   "title": "Diesel prices this week",
+   "label": "Above $6.12",
+   "volume_24h": 6888.17
+  },
+  {
+   "ticker": "KXMELOBSTER-27MAR31-T90",
+   "title": "Maine lobster landings in 2026",
+   "label": "Above 90 million pounds",
+   "volume_24h": 6854.0
+  },
+  {
+   "ticker": "KXDIESELMON-26NOV30-T6.30",
+   "title": "Diesel prices in Nov 2026",
+   "label": "Above $6.30",
+   "volume_24h": 6727.85
+  },
+  {
+   "ticker": "KXMELOBSTER-27MAR31-T80",
+   "title": "Maine lobster landings in 2026",
+   "label": "Above 80 million pounds",
+   "volume_24h": 6477.15
+  },
+  {
+   "ticker": "KXAAAGASM-26NOV30-3.80",
+   "title": "Gas prices in the US in Nov 2026?",
+   "label": "Above 3.80",
+   "volume_24h": 6424.75
+  },
+  {
+   "ticker": "KXILNUCLEAR-27FEB28-T95.0",
+   "title": "Illinois nuclear electricity generation in 2026",
+   "label": "Above 95.0 TWh",
+   "volume_24h": 6405.82
+  },
+  {
+   "ticker": "KXNHMAPLE-27JUN30-T170000",
+   "title": "New Hampshire maple syrup production in 2027",
+   "label": "Above 170,000 gallons",
+   "volume_24h": 6131.0
+  },
+  {
+   "ticker": "KXUSHOMEINVENT-26NOV05-T1175000",
+   "title": "US active housing listings in October",
+   "label": "Above 1,175,000 listings",
+   "volume_24h": 5692.97
+  },
+  {
+   "ticker": "KXCBDCHILE-26DEC15-H25",
+   "title": "Chile rate decision in December",
+   "label": "Hike 1-25bps",
+   "volume_24h": 5570.45
+  },
+  {
+   "ticker": "KXPAMFGEMP-27APR30-T555000",
+   "title": "Pennsylvania annual-average manufacturing employment in 2026",
+   "label": "Above 555,000 jobs",
+   "volume_24h": 5565.36
+  },
+  {
+   "ticker": "KXDIESELMON-26NOV30-T6.10",
+   "title": "Diesel prices in Nov 2026",
+   "label": "Above $6.10",
+   "volume_24h": 5503.94
+  },
+  {
+   "ticker": "KXPAYROLLS-26OCT-T50000",
+   "title": "Jobs numbers in October 2026?",
+   "label": "Above 50,000",
+   "volume_24h": 5353.65
+  },
+  {
+   "ticker": "KXDIESELW-26NOV09-T6.16",
+   "title": "Diesel prices this week",
+   "label": "Above $6.16",
+   "volume_24h": 5314.84
+  },
+  {
+   "ticker": "KXPAYROLLS-26OCT-T0",
+   "title": "Jobs numbers in October 2026?",
+   "label": "Above 0",
+   "volume_24h": 5146.41
+  },
+  {
+   "ticker": "KXSDCORNYIELD-27JAN31-T130",
+   "title": "South Dakota corn yield in 2026",
+   "label": "Above 130 bu/acre",
+   "volume_24h": 4893.66
+  },
+  {
+   "ticker": "KXCBDECISIONMEXICO-26NOV05-HOLD",
+   "title": "Bank of Mexico rate decision in November",
+   "label": "Maintain current rate",
+   "volume_24h": 4875.58
+  },
+  {
+   "ticker": "KXAAAGASMAX-26DEC31-5.00",
+   "title": "How high will US gas prices get in 2026?",
+   "label": "Above $5.00",
+   "volume_24h": 4866.71
+  },
+  {
+   "ticker": "KXCPIYOY-26NOV-T3.7",
+   "title": "CPI YoY in November",
+   "label": "Above 3.7%",
+   "volume_24h": 4710.94
+  },
+  {
+   "ticker": "KXDIESELMON-26NOV30-T5.90",
+   "title": "Diesel prices in Nov 2026",
+   "label": "Above $5.90",
+   "volume_24h": 4687.0
+  },
+  {
+   "ticker": "KXMELOBSTER-27MAR31-T75",
+   "title": "Maine lobster landings in 2026",
+   "label": "Above 75 million pounds",
+   "volume_24h": 4534.99
+  },
+  {
+   "ticker": "KXFEDDECISION-27JAN-H0",
+   "title": "Fed decision in Jan 2027?",
+   "label": "Fed maintains rate",
+   "volume_24h": 4364.24
+  },
+  {
+   "ticker": "KXDIESELMON-26NOV30-T6.20",
+   "title": "Diesel prices in Nov 2026",
+   "label": "Above $6.20",
+   "volume_24h": 4217.31
+  },
+  {
+   "ticker": "KXCPIYOY-26NOV-T3.6",
+   "title": "CPI YoY in November",
+   "label": "Above 3.6%",
+   "volume_24h": 4205.19
+  },
+  {
+   "ticker": "KXDIESELMON-26NOV30-T6.00",
+   "title": "Diesel prices in Nov 2026",
+   "label": "Above $6.00",
+   "volume_24h": 4111.25
+  },
+  {
+   "ticker": "KXDIESELW-26NOV09-T6.18",
+   "title": "Diesel prices this week",
+   "label": "Above $6.18",
+   "volume_24h": 4012.81
+  },
+  {
+   "ticker": "KXFEDFUNDSYEAR-28JAN01-T3.25",
+   "title": "Fed funds rate at end of 2027",
+   "label": "Above 3.25%",
+   "volume_24h": 3912.88
+  },
+  {
+   "ticker": "KXFEDDECISION-27JAN-H25",
+   "title": "Fed decision in Jan 2027?",
+   "label": "Hike 25bps",
+   "volume_24h": 3758.44
+  },
+  {
+   "ticker": "KXSDCORNYIELD-27JAN31-T165",
+   "title": "South Dakota corn yield in 2026",
+   "label": "Above 165 bu/acre",
+   "volume_24h": 3629.92
+  },
+  {
+   "ticker": "KXCPI-26NOV-T0.1",
+   "title": "CPI in November",
+   "label": "Above 0.1%",
+   "volume_24h": 3595.27
+  },
+  {
+   "ticker": "KXCBDECISIONCANADA-26DEC-H0",
+   "title": "Bank of Canada decision in Dec 2026?",
+   "label": "Maintains rate",
+   "volume_24h": 3572.38
+  },
+  {
+   "ticker": "KXAAAGASDME-26NOV05-4.2250",
+   "title": "Maine gas prices tomorrow",
+   "label": "Above 4.2250",
+   "volume_24h": 3421.39
+  },
+  {
+   "ticker": "KXU3-26OCT-T4.1",
+   "title": "Unemployment in October",
+   "label": "Above 4.1%",
+   "volume_24h": 3401.92
+  },
+  {
+   "ticker": "KXSDCORNYIELD-27JAN31-T135",
+   "title": "South Dakota corn yield in 2026",
+   "label": "Above 135 bu/acre",
+   "volume_24h": 3232.67
+  },
+  {
+   "ticker": "KXAAAGASDUT-26NOV05-4.4950",
+   "title": "Utah gas prices tomorrow",
+   "label": "Above 4.4950",
+   "volume_24h": 3029.0
+  },
+  {
+   "ticker": "KXCPICORE-26OCT-T0.0",
+   "title": "Core CPI in October",
+   "label": "Above 0.0%",
+   "volume_24h": 3010.0
+  },
+  {
+   "ticker": "KXCPICORE-26OCT-T0.1",
+   "title": "Core CPI in October",
+   "label": "Above 0.1%",
+   "volume_24h": 2981.23
+  },
+  {
+   "ticker": "KXVTPERMITS-27MAY03-T2200",
+   "title": "Housing units authorized in Vermont in 2026",
+   "label": "Above 2,200 units",
+   "volume_24h": 2978.2
+  },
+  {
+   "ticker": "KXCHAICUTS-26NOV05-T1",
+   "title": "Will AI be the #1 reason for job cuts in October?",
+   "label": "AI #1?",
+   "volume_24h": 2900.1
+  },
+  {
+   "ticker": "KXMTCATTLE-27JAN31-T2140000",
+   "title": "Will Montana cattle inventory rise YoY?",
+   "label": "Above 2,140,000 head",
+   "volume_24h": 2844.58
+  },
+  {
+   "ticker": "KXAAAGASM-26NOV30-3.50",
+   "title": "Gas prices in the US in Nov 2026?",
+   "label": "Above 3.50",
+   "volume_24h": 2765.96
+  },
+  {
+   "ticker": "KXU3MAX-27-4.8",
+   "title": "How high will unemployment get in 2026?",
+   "label": "Above 4.8%",
+   "volume_24h": 2740.65
+  }
+ ]
+}
