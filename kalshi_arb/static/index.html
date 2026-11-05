@@ -155,6 +155,8 @@ a.btn:hover { border-color: var(--accent); }
 .sec-nav a { font-size: 13px; text-decoration: none; color: var(--text-primary); border: 1px solid var(--border); background: var(--surface-1); border-radius: 999px; padding: 4px 12px; }
 .sec-nav a:hover { border-color: var(--accent); }
 .flat-grid { padding: 12px 0 0; }
+h3.grp { font-size: 14px; margin: 0; padding: 16px 16px 0; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; }
+h3.grp + .indicators { padding-top: 10px; }
 .up { color: var(--good-ink); }
 .down { color: var(--critical); }
 .flat { color: var(--text-muted); }
@@ -367,7 +369,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     </section>
     <div class="indicators flat-grid" id="ind-rates"></div>
     <div id="macro-sections"></div>
-    <p class="note" style="padding:0">How to read the cards: each Kalshi "above X" ladder is a probability distribution. Cards show its median, the 10–90% range and the change over 24 hours (comparing the same strikes). Strikes with spreads over 10¢ are ignored. Where Kalshi lists several releases or a year-end contract, the small chart shows the implied path over the next year, plotted by the period each contract measures. Most monthly series are only listed one to three releases ahead, so housing has no path yet.</p>
+    <p class="note" style="padding:0">How to read the cards: each Kalshi "above X" ladder is a probability distribution. Cards show its median, the 10–90% range and the change over 24 hours (comparing the same strikes). Strikes with spreads over 10¢ are ignored. Where Kalshi lists several releases or a year-end contract, the small chart shows the implied path over the next year, plotted by the period each contract measures. Most monthly series are only listed one to three releases ahead, so housing has no path yet. "Highest … this year" cards are distributions of the year's peak, not its level. CPI component cards are BLS index levels.</p>
   </div>
 
   <footer id="footer">Data: Kalshi public market-data API. Not investment advice.</footer>
@@ -712,7 +714,13 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   // ---------- Expectations ----------
   const fmtPct = (v, d = 2) => v == null ? "—" : v.toFixed(d) + "%";
   const bp = (x) => x == null ? "—" : `<span class="${Math.abs(x) < 0.004 ? "flat" : ""}">${signC(x * 100, 1)}bp</span>`;
-  const delta = (x, unit, d) => x == null ? `<span class="flat">—</span>` : `<span class="${Math.abs(x) < 1e-9 ? "flat" : ""}" style="font-weight:600">${signC(x, d)}${unit === "%" ? "pp" : " " + unit}</span>`;
+  const delta = (x, unit, d) => {
+    if (x == null) return `<span class="flat">—</span>`;
+    const sgn = x > 0 ? "+" : x < 0 ? "−" : "", a = Math.abs(x).toFixed(d);
+    const txt = unit === "%" ? `${sgn}${a}pp` : unit === "$" ? `${sgn}$${a}` : unit === "$k" ? `${sgn}$${a}k`
+      : unit === "index" ? `${sgn}${a} pts` : unit === "¢/kWh" ? `${sgn}${a}¢` : `${sgn}${a} ${unit}`;
+    return `<span class="${Math.abs(x) < 1e-9 ? "flat" : ""}" style="font-weight:600">${txt}</span>`;
+  };
   const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", year: "2-digit" });
 
   function renderMacro() {
@@ -745,16 +753,30 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     const byKey = Object.fromEntries(secs.map((x) => [x.key, x]));
     $("#ind-rates").innerHTML = ((byKey.rates || {}).indicators || []).map(indCard).join("");
     $("#macro-sections").innerHTML = secs.filter((x) => x.key !== "rates").map((x) =>
-      `<h2 class="sec-title" id="sec-${x.key}">${esc(x.title)}</h2><section class="card"><div class="indicators">${x.indicators.map(indCard).join("") || `<div class="empty">No liquid ${esc(x.title.toLowerCase())} markets right now.</div>`}</div></section>`).join("");
+      `<h2 class="sec-title" id="sec-${x.key}">${esc(x.title)}</h2><section class="card">${groupCards(x)}</section>`).join("");
     $("#sec-nav").innerHTML = [["rates", "Interest rates"], ...secs.filter((x) => x.key !== "rates").map((x) => [x.key, x.title])]
       .map(([k, t]) => `<a href="#sec-${k}" data-sec="${k}">${esc(t)}</a>`).join("");
     $("#sec-nav").querySelectorAll("a").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); document.getElementById("sec-" + a.dataset.sec).scrollIntoView({ behavior: "smooth" }); }));
   }
 
+  // Cards in order, with a subheading wherever an indicator's group changes (e.g. Inflation → Energy).
+  function groupCards(sec) {
+    if (!sec.indicators.length) return `<div class="empty">No liquid ${esc(sec.title.toLowerCase())} markets right now.</div>`;
+    const groups = [];
+    for (const ind of sec.indicators) {
+      const g = ind.group || "";
+      if (!groups.length || groups[groups.length - 1].name !== g) groups.push({ name: g, items: [] });
+      groups[groups.length - 1].items.push(ind);
+    }
+    return groups.map((g) => `${g.name ? `<h3 class="grp">${esc(g.name)}</h3>` : (groups.length > 1 ? `<h3 class="grp">Headline</h3>` : "")}<div class="indicators">${g.items.map(indCard).join("")}</div>`).join("");
+  }
+
   function indCard(ind) {
     const dec = ind.decimals, unit = ind.unit;
+    const num = (v) => v.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec });
     const fmt = (v) => v == null ? "—" : unit === "$k" ? "$" + Math.round(v).toLocaleString() + "k"
-      : v.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec }) + (unit === "%" ? "%" : unit === "M" ? "M" : " " + unit);
+      : unit === "$" ? "$" + num(v) : unit === "index" ? num(v) : unit === "¢/kWh" ? num(v) + "¢/kWh"
+      : num(v) + (unit === "%" ? "%" : unit === "M" ? "M" : " " + unit);
     const pts = ind.points, d = pts[0];
     const ch = d.change_24h ? d.change_24h.median : null;
     const bars = (d.buckets || []).filter((b) => b.p > 0.002);
@@ -777,7 +799,9 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   function pathSvg(pts, fmt) {
     const W = 560, H = 86, L = 6, R = 6, T = 14, B = 16;
     const when = (p) => +new Date(p.period || p.date);
-    const t0 = Math.min(Date.now(), ...pts.map(when)), t1 = Math.max(Date.now() + 365 * 864e5, ...pts.map(when));
+    // Axis covers the points Kalshi lists (at least ~3 months), so short daily/weekly paths aren't squashed.
+    const t0 = Math.min(Date.now(), ...pts.map(when));
+    const last = Math.max(...pts.map(when)), t1 = Math.max(last + (last - t0) * 0.06, Date.now() + 90 * 864e5);
     const vals = pts.flatMap((p) => [p.p10, p.p90, p.median]);
     let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.05 || 0.1; lo -= pad; hi += pad;
     const X = (p) => L + (when(p) - t0) / (t1 - t0) * (W - L - R), Y = (v) => T + (hi - v) / (hi - lo) * (H - T - B);

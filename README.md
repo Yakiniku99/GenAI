@@ -167,7 +167,10 @@ with how the price has moved since, from the taker's side.
 |---|---|---|
 | Interest rates | Fed path from FOMC decision markets (KXFEDDECISION + KXFED), fed funds at year-end, EFFR | Every meeting in the next 12 months |
 | Housing | 30Y mortgage rate this week, this year's mortgage-rate high, existing and new home sales, housing starts, building permits, median existing and new home prices, active listings | Next release only (Kalshi lists one month ahead) |
-| Inflation | CPI and core CPI (y/y and m/m), PPI (m/m, y/y), PCE and core PCE | CPI y/y: monthly releases plus the December-next-year contract |
+| Inflation: headline | CPI and core CPI (y/y and m/m), PPI (m/m, y/y), PCE and core PCE | CPI y/y: monthly releases plus the December-next-year contract |
+| Inflation: energy | AAA gasoline and diesel (tomorrow, this week, this month, diesel year-end), this year's gasoline, diesel and natural-gas peaks, average electricity price, electricity CPI | Diesel: tomorrow → year-end; gasoline: tomorrow → month |
+| Inflation: CPI components | Shelter, owners' equivalent rent, gasoline, used cars, airline fares, CPI-U index, core goods, grocery | Next release only (BLS index levels) |
+| Inflation: materials & food | Softwood lumber PPI peak, paper price index, semiconductor PPI (when listed), FAO food price index | Next release only |
 | Employment | Unemployment, payrolls, initial and continuing claims, hourly earnings, labor force participation | Unemployment: monthly plus year-end contracts for this year and next |
 | Growth | Real GDP (quarterly), nominal GDP (calendar year) | Next three quarters |
 

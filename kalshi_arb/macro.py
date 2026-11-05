@@ -130,9 +130,9 @@ FED_SERIES = "KXFED"
 HORIZON_DAYS = 460  # a year ahead, plus the lag before next year's year-end contracts resolve
 
 
-def ind(key, label, unit, decimals, series, discrete=False, scale=1.0, note="", discrete_step=0.1):
+def ind(key, label, unit, decimals, series, discrete=False, scale=1.0, note="", discrete_step=0.1, group=""):
     return {"key": key, "label": label, "unit": unit, "decimals": decimals, "series": series,
-            "discrete": discrete, "scale": scale, "note": note, "discrete_step": discrete_step}
+            "discrete": discrete, "scale": scale, "note": note, "discrete_step": discrete_step, "group": group}
 
 
 # Each indicator joins its monthly/quarterly release markets with any year-end
@@ -165,6 +165,35 @@ SECTIONS = (
         ind("ppi_yoy", "PPI, year over year", "%", 1, ["KXUSPPIYOY"], discrete=True),
         ind("pce", "PCE inflation, month over month", "%", 1, ["KXPCEHEAD"], discrete=True),
         ind("core_pce", "Core PCE, month over month", "%", 1, ["KXPCECORE"], discrete=True),
+        # Energy: market prices, not CPI components
+        ind("gasoline", "Gasoline, AAA national average", "$", 2, ["KXAAAGASD", "KXAAAGASW", "KXAAAGASM"],
+            group="Energy", note="Tomorrow, this week and this month"),
+        ind("gasoline_high", "Highest gasoline price this year", "$", 2, ["KXAAAGASMAX"], group="Energy",
+            note="The year's peak, not its level"),
+        ind("diesel", "Diesel, national average", "$", 2, ["KXDIESELD", "KXDIESELW", "KXDIESELMON", "KXDIESELYE"],
+            group="Energy", note="Tomorrow through year-end"),
+        ind("diesel_high", "Highest diesel price this year", "$", 2, ["KXDIESELMAXY"], group="Energy",
+            note="The year's peak, not its level"),
+        ind("natgas_peak", "Highest natural gas spot price this year", "$", 2, ["KXNGASMAX"], group="Energy",
+            note="Henry Hub, $/MMBtu; the year's peak"),
+        ind("electricity", "Average US electricity price", "¢/kWh", 2, ["KXPOWERKWH"], group="Energy"),
+        ind("electricity_cpi", "Electricity CPI, year over year", "%", 1, ["KXCPIELECYOY"], discrete=True, group="Energy"),
+        # BLS CPI component indexes (index levels)
+        ind("shelter", "Shelter CPI", "index", 1, ["KXSHELTERCPI"], group="CPI components"),
+        ind("oer", "Owners' equivalent rent", "index", 1, ["KXOER"], group="CPI components"),
+        ind("gasoline_cpi", "Gasoline CPI", "index", 1, ["KXUSGASCPI"], group="CPI components"),
+        ind("used_cars", "Used cars and trucks CPI", "index", 1, ["KXUSEDCARCPI"], group="CPI components"),
+        ind("airfares", "Airline fares CPI", "index", 1, ["KXAIRFARECPI"], group="CPI components"),
+        ind("cpi_index", "CPI-U index (all items)", "index", 2, ["KXCPINDEX"], group="CPI components"),
+        ind("core_goods", "Core goods CPI, month over month", "%", 1, ["KXCPICOREGOODSMOM"], discrete=True,
+            group="CPI components"),
+        ind("grocery", "Grocery inflation, year-end", "%", 1, ["KXGROCERYCPI"], group="CPI components"),
+        # Producer prices for materials, and food
+        ind("lumber_ppi", "Softwood lumber PPI, high before next year", "index", 1, ["KXLUMBERPPIHIGH"],
+            group="Materials & food", note="The peak, not its level"),
+        ind("paper", "Paper price index", "index", 1, ["KXPAPER"], group="Materials & food"),
+        ind("semis_ppi", "Semiconductor PPI", "index", 1, ["KXPPISEMI"], group="Materials & food"),
+        ind("fao_food", "FAO Food Price Index (world)", "index", 1, ["KXFAOFPI"], group="Materials & food"),
     )),
     ("employment", "Employment", (
         ind("unemployment", "Unemployment rate", "%", 1, ["KXU3", "KXU3EOY"], discrete=True,
@@ -314,7 +343,14 @@ def reference_period(title: str, resolves: str) -> tuple[str, str]:
     "...in December 2027" / "year-end 2027" -> Dec 2027; "Q4 2026" -> Q4 2026.
     Falls back to the resolution date."""
     res = datetime.fromisoformat(resolves.replace("Z", "+00:00")) if resolves else None
+    title = re.sub(r"[\u200b-\u200d\ufeff]", "", title)  # zero-width characters appear in some titles
     t = title.lower()
+    before = re.search(r"\bbefore\s+(\d{4})\b", t)
+    if before:
+        y = int(before.group(1))
+        return f"by {y}", datetime(y - 1, 12, 15, tzinfo=timezone.utc).isoformat()
+    if res and re.search(r"\b(tomorrow|today|this week)\b", t):
+        return res.strftime("%b ") + str(res.day), res.isoformat()
     q = re.search(r"\bq([1-4])\s*(\d{4})", t)
     if q:
         qn, y = int(q.group(1)), int(q.group(2))
@@ -365,7 +401,7 @@ def indicator(cfg: dict, events: list[dict], now: datetime) -> dict | None:
     points.sort(key=lambda p: (p["period"], p["date"]))
     for p in points[1:]:
         p.pop("buckets", None)  # keep the snapshot small: only the next release's histogram
-    return {k: cfg[k] for k in ("key", "label", "unit", "decimals", "note")} | {"points": points}
+    return {k: cfg[k] for k in ("key", "label", "unit", "decimals", "note", "group")} | {"points": points}
 
 
 def sections(events: list[dict], now: datetime) -> list[dict]:
