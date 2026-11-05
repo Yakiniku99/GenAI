@@ -163,6 +163,11 @@ with how the price has moved since, from the taker's side.
 
 ## Expectations
 
+A **settlement calendar** at the top shows when each forecast on the tab resolves (Kalshi's expiration,
+usually the data release day), starting at the current month, with arrows to step through later
+months. Clicking a day lists what settles and highlights those cards, and clicking an item scrolls
+to its card. FOMC decision dates jump to the Fed path chart.
+
 | Section | Indicators (Kalshi series) | One-year path |
 |---|---|---|
 | Interest rates | Fed path from FOMC decision markets (KXFEDDECISION + KXFED), fed funds at year-end, EFFR | Every meeting in the next 12 months |

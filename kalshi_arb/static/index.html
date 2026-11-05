@@ -181,6 +181,41 @@ a.btn:hover { border-color: var(--accent); }
 .pathbox .pxl { position: absolute; top: 3px; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); white-space: nowrap; }
 .pathbox .pxl.l { transform: translateX(-3px); }
 .pathbox .pxl.r { transform: translateX(calc(-100% + 3px)); }
+.cal-card .card-head { align-items: center; }
+.cal-nav { display: flex; align-items: center; gap: 6px; }
+.cal-nav button { padding: 4px 10px; font-size: 13px; }
+.cal-nav button:disabled { opacity: .35; }
+#cal-title { min-width: 132px; text-align: center; font-weight: 600; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--grid); border-top: 1px solid var(--grid); }
+.cal-grid .dow { background: var(--surface-2); font-size: 11px; color: var(--text-secondary); text-align: center; padding: 5px 0; font-weight: 600; }
+.cal-grid .day { background: var(--surface-1); min-height: 84px; padding: 5px 6px; display: flex; flex-direction: column; gap: 3px; min-width: 0; text-align: left; border: 0; border-radius: 0; font: inherit; color: inherit; }
+.cal-grid .day.out { background: var(--bg); }
+.cal-grid .day.out .n { color: var(--text-muted); opacity: .6; }
+.cal-grid .day .n { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.cal-grid .day.today .n { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; }
+.cal-grid .day.has { cursor: pointer; }
+.cal-grid .day.has:hover { background: var(--surface-2); }
+.cal-grid .day.sel { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-grid .chip { font-size: 11px; line-height: 1.35; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--series-1); }
+.cal-grid .chip.fed { border-left-color: var(--warning); }
+.cal-grid .more { font-size: 11px; color: var(--text-muted); padding-left: 2px; }
+.cal-grid .cnt { display: none; }
+.cal-day { padding: 12px 16px 14px; border-top: 1px solid var(--grid); }
+.cal-day h3 { font-size: 14px; margin: 0 0 8px; }
+.cal-day ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 14px; }
+.cal-day li a { display: flex; justify-content: space-between; gap: 10px; text-decoration: none; color: var(--text-primary); font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); }
+.cal-day li a:hover { border-color: var(--accent); }
+.cal-day li .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-day li .per { color: var(--text-muted); font-size: 12px; margin-left: 4px; }
+.cal-day li .val { color: var(--text-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.flash { animation: flash 2.4s ease-out; }
+@keyframes flash { 0%, 35% { box-shadow: 0 0 0 3px var(--accent); border-color: var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (max-width: 640px) {
+  .cal-grid .day { min-height: 46px; padding: 4px; align-items: center; }
+  .cal-grid .chip, .cal-grid .more { display: none; }
+  .cal-grid .cnt { display: block; font-size: 10px; font-weight: 700; color: #fff; background: var(--series-1); border-radius: 999px; min-width: 18px; height: 18px; line-height: 18px; text-align: center; padding: 0 4px; }
+  .cal-card .card-head { flex-direction: column; align-items: flex-start; }
+}
 .read-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--text-secondary); margin: 2px 0 0; }
 .read-key i { display: inline-block; vertical-align: middle; margin-right: 6px; }
 .read-key .k-bar { width: 10px; height: 10px; border-radius: 2px; background: var(--series-1); }
@@ -383,6 +418,22 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   </div>
 
   <div class="tab-panel" id="tab-macro" hidden>
+    <section class="card cal-card" id="cal-card" aria-label="Settlement calendar">
+      <div class="card-head">
+        <div>
+          <h2>Settlement calendar</h2>
+          <p>When each forecast below resolves. Click a day to see what settles and jump to the cards.</p>
+        </div>
+        <div class="cal-nav">
+          <button type="button" id="cal-prev" aria-label="Previous month">◀</button>
+          <span id="cal-title" aria-live="polite"></span>
+          <button type="button" id="cal-next" aria-label="Next month">▶</button>
+          <button type="button" id="cal-today">Today</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="cal-grid" role="grid"></div>
+      <div class="cal-day" id="cal-day" hidden></div>
+    </section>
     <section class="gauges" id="gauges" aria-label="Headline expectations"></section>
     <nav class="sec-nav" id="sec-nav" aria-label="Sections"></nav>
     <div class="read-key" aria-label="How to read the cards">
@@ -392,7 +443,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       <span>Hover over a card for exact values; tap on a phone</span>
     </div>
     <h2 class="sec-title" id="sec-rates">Interest rates</h2>
-    <section class="card">
+    <section class="card" id="fed-card">
       <div class="card-head">
         <div>
           <h2>Fed funds path, next 12 months</h2>
@@ -762,6 +813,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     }
     $("#gauges").innerHTML = tiles.map(([l, v, n]) => `<div class="tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join("");
     renderFedChart(ms);
+    buildCalendar(mac);
     const rows = fp.meetings.map((m) => {
       const top = (m.decision || []).slice(0, 3).map((o) => `${esc(o.label)} ${Math.round(o.p * 100)}%`).join(" · ");
       const lad = m.ladder;
@@ -822,7 +874,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
 
     const hasPath = pts.length > 1;
     const head = hasPath ? `<div class="chart-head"><span class="mini-seg" role="group" aria-label="Chart"><button type="button" data-view="path" aria-pressed="true">Path</button><button type="button" data-view="hist" aria-pressed="false">Next release</button></span></div>` : "";
-    return `<div class="ind" tabindex="0" data-view="${hasPath ? "path" : "hist"}">
+    return `<div class="ind" id="ind-${esc(ind.key)}" tabindex="0" data-view="${hasPath ? "path" : "hist"}">
       <div class="ind-head"><div class="t">${esc(ind.label)}</div><div class="tags">${thin}${pill}</div></div>
       ${ind.note ? `<div class="note2">${esc(ind.note)}</div>` : ""}
       <div class="v">${fmt(d.median)}</div>
@@ -881,6 +933,108 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     const axis = pts.map((p, i) => { const x = X(when(p)); if (x - lastAx < 14 && i !== pts.length - 1) return ""; if (x - lastAx < 14) return ""; lastAx = x; return `<span class="pxl ${edge(x)}" style="left:${x}%">${esc(p.period_label || "")}</span>`; }).join("");
     return `<div class="pathbox" role="img" aria-label="Implied path over the next year"><div class="plot">${svg}${marks}<span class="ptoday" style="left:${nowX}%">today</span></div><div class="paxis">${axis}</div></div>`;
   }
+
+
+  // ---------- Settlement calendar ----------
+  const cal = { events: [], month: null, sel: null };
+  const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  function buildCalendar(mac) {
+    const evs = [];
+    for (const sec of mac.sections || []) {
+      for (const ind of sec.indicators) {
+        ind.points.forEach((p, i) => {
+          if (!p.date) return;
+          evs.push({ day: dayKey(new Date(p.date)), when: p.date, label: ind.label, period: p.period_label, title: p.title,
+                     target: "ind-" + ind.key, pointIndex: i, section: sec.title, median: p.median, ind });
+        });
+      }
+    }
+    for (const m of (mac.fed_path || {}).meetings || []) {
+      const top = (m.decision || [])[0];
+      evs.push({ day: dayKey(new Date(m.date)), when: m.date, label: "FOMC rate decision", fed: true, target: "fed-card", section: "Interest rates",
+                 title: top ? `Most likely: ${top.label} (${Math.round(top.p * 100)}%)` : "FOMC meeting", expected: m.expected });
+    }
+    evs.sort((a, b) => a.when < b.when ? -1 : 1);
+    cal.events = evs;
+    if (!cal.month) { const t = new Date(); cal.month = new Date(t.getFullYear(), t.getMonth(), 1); }
+    renderCalendar();
+  }
+
+  function monthBounds() {
+    const t = new Date(), first = new Date(t.getFullYear(), t.getMonth(), 1);
+    const lastEv = cal.events.length ? new Date(cal.events[cal.events.length - 1].when) : first;
+    return [first, new Date(lastEv.getFullYear(), lastEv.getMonth(), 1)];
+  }
+
+  function renderCalendar() {
+    const grid = $("#cal-grid"), m = cal.month, [minM, maxM] = monthBounds();
+    $("#cal-title").textContent = m.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    $("#cal-prev").disabled = m <= minM;
+    $("#cal-next").disabled = m >= maxM;
+    const byDay = {};
+    for (const e of cal.events) (byDay[e.day] = byDay[e.day] || []).push(e);
+    const start = new Date(m.getFullYear(), m.getMonth(), 1 - m.getDay());   // Sunday on or before the 1st
+    const todayK = dayKey(new Date());
+    const dows = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => `<div class="dow" role="columnheader">${d}</div>`).join("");
+    let cells = "";
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      if (i >= 35 && d.getMonth() !== m.getMonth()) break;   // drop an all-next-month sixth row
+      const k = dayKey(d), evs = byDay[k] || [], out = d.getMonth() !== m.getMonth();
+      const chips = evs.slice(0, 3).map((e) => `<span class="chip ${e.fed ? "fed" : ""}">${esc(e.label)}</span>`).join("");
+      const more = evs.length > 3 ? `<span class="more">+${evs.length - 3} more</span>` : "";
+      const aria = evs.length ? `${d.toDateString()}: ${evs.length} settlement${evs.length > 1 ? "s" : ""}` : d.toDateString();
+      cells += `<button type="button" class="day ${out ? "out" : ""} ${k === todayK ? "today" : ""} ${evs.length ? "has" : ""} ${cal.sel === k ? "sel" : ""}" data-day="${k}" ${evs.length ? "" : "tabindex='-1'"} aria-label="${esc(aria)}"><span class="n">${d.getDate()}</span>${chips}${more}${evs.length ? `<span class="cnt">${evs.length}</span>` : ""}</button>`;
+    }
+    grid.innerHTML = dows + cells;
+    renderCalDay();
+  }
+
+  function renderCalDay() {
+    const box = $("#cal-day");
+    const evs = cal.sel ? cal.events.filter((e) => e.day === cal.sel) : [];
+    if (!evs.length) { box.hidden = true; return; }
+    box.hidden = false;
+    const d = new Date(evs[0].when);
+    box.innerHTML = `<h3>Settling ${d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</h3><ul>${evs.map((e, i) => {
+      const val = e.fed ? (e.expected != null ? `exp. ${e.expected.toFixed(2)}%` : "") : (e.ind ? indValue(e.ind, e.median) : "");
+      return `<li><a href="#${esc(e.target)}" data-i="${i}" title="${esc(e.title || "")}"><span class="what">${esc(e.label)}${e.period && !e.fed ? ` <span class="per">${esc(e.period)}</span>` : ""}</span><span class="val">${esc(val)}</span></a></li>`;
+    }).join("")}</ul>`;
+    box.querySelectorAll("a").forEach((a) => a.addEventListener("click", (ev) => { ev.preventDefault(); jumpTo(evs[+a.dataset.i]); }));
+  }
+
+  function indValue(ind, v) {
+    if (v == null) return "";
+    const dd = ind.decimals, n = v.toLocaleString(undefined, { minimumFractionDigits: dd, maximumFractionDigits: dd });
+    return ind.unit === "$k" ? "$" + Math.round(v).toLocaleString() + "k" : ind.unit === "$" ? "$" + n : ind.unit === "%" ? n + "%"
+      : ind.unit === "index" ? n : ind.unit === "¢/kWh" ? n + "¢" : n + ind.unit;
+  }
+
+  function jumpTo(e, smooth = true) {
+    const el = document.getElementById(e.target);
+    if (!el) return;
+    if (e.pointIndex > 0 && el.dataset.view === "hist") {  // later points live on the path chart
+      el.querySelector('.mini-seg button[data-view="path"]')?.click();
+    }
+    el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  }
+
+  $("#cal-grid").addEventListener("click", (ev) => {
+    const cell = ev.target.closest(".day.has");
+    if (!cell) return;
+    cal.sel = cell.dataset.day;
+    renderCalendar();
+    const evs = cal.events.filter((e) => e.day === cal.sel);
+    // Highlight every matching card; scroll only to the day list so the person can pick.
+    const seen = new Set();
+    evs.forEach((e) => { if (seen.has(e.target)) return; seen.add(e.target); const el = document.getElementById(e.target); if (el) { el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); } });
+    if (evs.length === 1) jumpTo(evs[0]); else $("#cal-day").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  $("#cal-prev").addEventListener("click", () => { cal.month = new Date(cal.month.getFullYear(), cal.month.getMonth() - 1, 1); renderCalendar(); });
+  $("#cal-next").addEventListener("click", () => { cal.month = new Date(cal.month.getFullYear(), cal.month.getMonth() + 1, 1); renderCalendar(); });
+  $("#cal-today").addEventListener("click", () => { const t = new Date(); cal.month = new Date(t.getFullYear(), t.getMonth(), 1); cal.sel = null; renderCalendar(); });
 
   // Path / Next release toggle on cards with a path.
   document.addEventListener("click", (e) => {
