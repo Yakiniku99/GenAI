@@ -63,10 +63,12 @@ def main(argv: list[str] | None = None) -> int:
             with open(a.out, "w") as f:
                 json.dump(snap, f, indent=1)
             print(f"wrote {a.out}", file=sys.stderr)
-        arbs = [o for o in snap["opportunities"] if o["is_arb"]]
+        arbs = [o for o in snap["opportunities"] if o["is_arb"] and not o["filtered"]]
+        hidden = sum(1 for o in snap["opportunities"] if o["is_arb"] and o["filtered"])
         print(f"{snap['markets_scanned']} markets in {snap['events_scanned']} events "
               f"({snap['scan_seconds']}s); {len(arbs)} arbitrage opportunities "
-              f"after {snap['fee_model']['label']} fees")
+              f"after {snap['fee_model']['label']} fees"
+              + (f" ({hidden} more hidden: stale or outdated quotes)" if hidden else ""))
         for o in arbs[:20]:
             legs = " + ".join(f"{l['side'].upper()} {l['ticker']} @{l['price']:.2f}" for l in o["legs"])
             print(f"  ${o['net_edge']:.3f}/basket x{o['max_baskets']} = ${o['net_profit']:.2f}  "

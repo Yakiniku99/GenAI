@@ -81,6 +81,17 @@ with no holes. Otherwise it tags the basket **⚠ verify exhaustive** and keeps 
 "Guaranteed arbitrages" count. Example: a *"When will the next US recession start?"* set
 looks like an 80¢ arbitrage but has no "no recession" outcome.
 
+### Stale and outdated baskets are filtered out
+
+Some baskets look like arbitrage only because their quotes can't be trusted. These are hidden by default
+(a "Show stale / outdated" toggle brings them back with the reason):
+
+| Filter | Rule | Example |
+|---|---|---|
+| **Prices imply a missing outcome** | "Buy every YES" set whose asks sum below 80¢, with no strike coverage proving exhaustiveness | *When will the next US recession start?* YES asks summed to $0.16, meaning the market priced roughly 84% on "no recession", which isn't listed |
+| **Outcome periods already over** | An outcome names a quarter, month or year that has ended | The same set listed Q4 2024 to Q1 2026. These stay open until Dec 31, 2026 only because NBER dates recessions after the fact |
+| **Stale quotes** | Any leg with no trade in 14+ days (from Kalshi's trade history, checked for the top candidates) | Q1 2025 last traded 40 days before the scan |
+
 ## Dashboard
 
 * **Summary tiles**: guaranteed arbitrage count, capturable profit, best net edge, coverage.

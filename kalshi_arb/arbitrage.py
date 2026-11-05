@@ -28,6 +28,7 @@ displayed depth is the YES-bid depth.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from itertools import combinations
@@ -183,6 +184,8 @@ class Leg:
     volume_24h: float = 0.0           # contracts traded in the last 24h
     open_interest: float = 0.0        # contracts outstanding
     depth_5c: float | None = None     # contracts offered within 5c of best ask (order book)
+    last_trade: str | None = None     # time of the most recent trade (candidates only)
+    days_since_trade: float | None = None
 
     @classmethod
     def from_quote(cls, q: "Quote", side: str) -> "Leg":
@@ -303,8 +306,14 @@ class Opportunity:
     def is_arb(self) -> bool:
         return self.net_edge > EPS and self.max_baskets >= 1
 
+    @property
+    def filter_reasons(self) -> list[str]:
+        return [f for f in self.flags if f in FILTER_FLAGS]
+
     def to_dict(self) -> dict:
         d = asdict(self)
+        d["filtered"] = bool(self.filter_reasons)
+        d["filter_reasons"] = self.filter_reasons
         d["strategy_label"] = STRATEGY_LABELS[self.strategy]
         d["is_arb"] = self.is_arb
         d["url"] = f"https://kalshi.com/markets/{self.series_ticker.lower()}"
@@ -396,6 +405,58 @@ def strike_coverage_is_exhaustive(quotes: list[Quote]) -> bool:
     return all(abs(g - tick) <= 1e-6 for g in positive) and (not widths or tick <= min(widths) + EPS)
 
 
+# Baskets with these flags are hidden from the opportunity list by default:
+# they look profitable only because the quotes or the outcome set can't be trusted.
+FILTER_FLAGS = ("implied_missing_outcome", "past_period", "stale_quotes")
+
+# A set whose YES asks sum below this is priced by the market as missing an
+# outcome (e.g. "no recession"), so buying every YES isn't guaranteed to pay.
+MIN_PLAUSIBLE_SET_PRICE = 0.80
+STALE_TRADE_DAYS = 14.0
+
+_MONTHS = {m: i for i, m in enumerate(
+    ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
+
+
+def period_end(label: str) -> datetime | None:
+    """End of the calendar period an outcome label names ("Q4 2024",
+    "March 2025", "2024"), or None if the label isn't a period."""
+    text = label.strip().lower()
+    m = re.fullmatch(r"(?:q([1-4])|([1-4])q)\s*(\d{4})|(\d{4})\s*q([1-4])", text)
+    if m:
+        q = int(m.group(1) or m.group(2) or m.group(5))
+        y = int(m.group(3) or m.group(4))
+        month = q * 3
+    else:
+        m = re.fullmatch(r"([a-z]{3})[a-z]*\.?\s+(\d{4})", text)
+        if m and m.group(1) in _MONTHS:
+            y, month = int(m.group(2)), _MONTHS[m.group(1)]
+        elif re.fullmatch(r"(19|20)\d{2}", text):
+            y, month = int(text), 12
+        else:
+            return None
+    nxt = datetime(y + (month == 12), month % 12 + 1, 1, tzinfo=timezone.utc)
+    return nxt
+
+
+def mark_stale(opp: Opportunity, now: datetime, stale_days: float = STALE_TRADE_DAYS) -> None:
+    """Flag a basket whose legs haven't traded recently (needs last_trade set)."""
+    stale = False
+    for leg in opp.legs:
+        if leg.last_trade is None:
+            stale = True
+            continue
+        leg.days_since_trade = round(_days_since(leg.last_trade, now), 1)
+        stale |= leg.days_since_trade > stale_days
+    if stale and "stale_quotes" not in opp.flags:
+        opp.flags.append("stale_quotes")
+
+
+def _days_since(iso: str, now: datetime) -> float:
+    t = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return max((now - t).total_seconds() / 86400, 0.0)
+
+
 def analyze_event(event: dict, fee_fn: FeeFn | None = None, now: datetime | None = None) -> list[Opportunity]:
     """Return every candidate basket for one event (profitable or not)."""
     now = now or datetime.now(timezone.utc)
@@ -414,6 +475,10 @@ def analyze_event(event: dict, fee_fn: FeeFn | None = None, now: datetime | None
                 flags.append("inactive_outcomes")
             if not strike_coverage_is_exhaustive(quotes):
                 flags.append("verify_exhaustive")
+                if sum(q.yes_ask for q in quotes) < MIN_PLAUSIBLE_SET_PRICE:
+                    flags.append("implied_missing_outcome")
+            if any((end := period_end(q.label)) is not None and end <= now for q in quotes):
+                flags.append("past_period")
             out.append(price_basket("me_all_yes", event, quotes, ["yes"] * len(quotes),
                                     1.0, fee_fn, now, flags))
         # Buy every NO: k legs pay >= k-1 whenever at most one resolves YES.

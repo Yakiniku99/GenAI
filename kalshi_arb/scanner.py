@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from .arbitrage import (DEFAULT_FEE_MODEL, FEE_MODELS, Opportunity, Quote, analyze_events,
-                        asks_from_orderbook, depth_within, strike_coverage_is_exhaustive, walk_book)
+                        asks_from_orderbook, depth_within, mark_stale, strike_coverage_is_exhaustive,
+                        walk_book)
 from .client import KalshiClient
 
 ProgressFn = Callable[[int, int], None]
@@ -37,26 +38,35 @@ def _event_summary(ev: dict) -> dict | None:
 
 
 def add_book_depth(client: KalshiClient, opps: list[Opportunity], fee_model: str,
-                   fee_mult: dict[str, float], limit: int, workers: int) -> list[str]:
-    """Read full order books for the best `limit` candidates (plus every
-    arbitrage) and record how many baskets can be filled profitably."""
+                   fee_mult: dict[str, float], limit: int, workers: int,
+                   now: datetime | None = None) -> list[str]:
+    """For every arbitrage plus the best `limit` other candidates, read the
+    full order book (fillable size) and the last trade time (stale quotes)."""
     if limit <= 0:
         return []
+    now = now or datetime.now(timezone.utc)
     ranked = [o for o in opps if o.max_baskets >= 1]
     chosen = [o for o in ranked if o.is_arb]
-    chosen += [o for o in ranked if not o.is_arb][:max(limit - len(chosen), 0)]
+    chosen += [o for o in ranked if not o.is_arb and not o.filter_reasons][:max(limit - len(chosen), 0)]
     tickers = sorted({l.ticker for o in chosen for l in o.legs})
     books: dict[str, dict] = {}
+    last_trade: dict[str, str | None] = {}
     errors: list[str] = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(client.orderbook, t): t for t in tickers}
+        futures = {pool.submit(client.orderbook, t): ("book", t) for t in tickers}
+        futures |= {pool.submit(client.last_trade_time, t): ("trade", t) for t in tickers}
         for fut in as_completed(futures):
+            kind, t = futures[fut]
             try:
-                books[futures[fut]] = fut.result()
+                (books if kind == "book" else last_trade)[t] = fut.result()
             except Exception as e:
-                errors.append(f"orderbook {futures[fut]}: {e}")
+                errors.append(f"{kind} {t}: {e}")
     model = FEE_MODELS[fee_model]
     for o in chosen:
+        if all(l.ticker in last_trade for l in o.legs):
+            for leg in o.legs:
+                leg.last_trade = last_trade[leg.ticker]
+            mark_stale(o, now)
         if any(l.ticker not in books for l in o.legs):
             continue
         ladders = [asks_from_orderbook(books[l.ticker], l.side) for l in o.legs]
@@ -101,8 +111,10 @@ def scan(
 
     now = datetime.now(timezone.utc)
     opps = analyze_events(events, fee_mult, now, fee_model)
-    book_errors = add_book_depth(client, opps, fee_model, fee_mult, depth_candidates, workers)
+    book_errors = add_book_depth(client, opps, fee_model, fee_mult, depth_candidates, workers, now)
     errors += book_errors
+    # Trustworthy baskets first; filtered ones (stale / outdated / missing outcome) sink.
+    opps.sort(key=lambda o: (not o.filter_reasons, o.is_arb, o.net_edge, o.net_profit), reverse=True)
     summaries = [s for s in (_event_summary(e) for e in events) if s]
     n_markets = sum(len(e.get("markets") or []) for e in events)
     return {
@@ -117,6 +129,7 @@ def scan(
         "markets_scanned": n_markets,
         "series_titles": {k: v for k, v in titles.items() if any(e.get("series_ticker") == k for e in events)},
         "depth_candidates": depth_candidates,
+        "filtered_count": sum(1 for o in opps if o.filter_reasons),
         "opportunities": [o.to_dict() for o in opps],
         "mutually_exclusive_events": sorted(summaries, key=lambda s: -(s["volume_24h"] or 0)),
         "errors": errors,

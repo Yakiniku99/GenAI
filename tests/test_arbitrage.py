@@ -2,8 +2,8 @@ import unittest
 from datetime import datetime, timezone
 
 from kalshi_arb.arbitrage import (FEE_MODELS, Quote, analyze_event, analyze_events, asks_from_orderbook,
-                                  depth_within, robinhood_fee, strike_coverage_is_exhaustive, taker_fee,
-                                  walk_book)
+                                  depth_within, mark_stale, period_end, robinhood_fee,
+                                  strike_coverage_is_exhaustive, taker_fee, walk_book)
 
 KALSHI = FEE_MODELS["kalshi"].for_series()
 
@@ -185,6 +185,58 @@ class LiquidityTests(unittest.TestCase):
         thin = event([mkt("A", 0.30, 0.45, bid_size=5), mkt("B", 0.30, 0.45, bid_size=5)])
         no = [o for o in analyze_event(thin, now=NOW) if o.strategy == "me_all_no"][0]
         self.assertEqual(no.liquidity["tier"], "thin")
+
+
+class FilterTests(unittest.TestCase):
+    """Regression for KXNBERRECESSQ: "When will the next US recession start?"
+    listed past quarters only, with YES asks summing to $0.16."""
+
+    def recession_event(self):
+        legs = [("Q4 2024", 0.031), ("Q1 2025", 0.009), ("Q2 2025", 0.001),
+                ("Q3 2025", 0.028), ("Q4 2025", 0.043), ("Q1 2026", 0.048)]
+        ms = [mkt(f"R-{i}", 0.0, ask) for i, (_, ask) in enumerate(legs)]
+        for m, (label, _) in zip(ms, legs):
+            m["yes_sub_title"] = label
+            m["yes_bid_dollars"], m["yes_bid_size_fp"] = "0.0010", "100"
+        return event(ms)
+
+    def test_recession_set_is_filtered(self):
+        yes = [o for o in analyze_event(self.recession_event(), now=NOW) if o.strategy == "me_all_yes"][0]
+        self.assertTrue(yes.is_arb)  # looks profitable on paper...
+        self.assertIn("implied_missing_outcome", yes.filter_reasons)  # ...but sums to $0.16
+        self.assertIn("past_period", yes.filter_reasons)  # and every quarter is over
+        self.assertTrue(yes.to_dict()["filtered"])
+
+    def test_period_end_parsing(self):
+        self.assertEqual(period_end("Q4 2024").isoformat(), "2025-01-01T00:00:00+00:00")
+        self.assertEqual(period_end("2025Q1").month, 4)
+        self.assertEqual(period_end("March 2025").month, 4)
+        self.assertEqual(period_end("2024").year, 2025)
+        for label in ("Above 3.25%", "Hike 25bps", "Cut 1-12.5bps", "Below $2.70"):
+            self.assertIsNone(period_end(label), label)
+
+    def test_fairly_priced_set_is_not_filtered(self):
+        ev = event([mkt("HOLD", 0.70, 0.72), mkt("CUT", 0.27, 0.29)])
+        for o in analyze_event(ev, now=NOW):
+            self.assertEqual(o.filter_reasons, [], o.strategy)
+
+    def test_stale_quotes(self):
+        ev = event([mkt("A", 0.40, 0.45), mkt("B", 0.40, 0.45), mkt("C", 0.40, 0.45)])
+        no = [o for o in analyze_event(ev, now=NOW) if o.strategy == "me_all_no"][0]
+        no.legs[0].last_trade = "2026-10-31T00:00:00Z"   # 1 day before NOW
+        no.legs[1].last_trade = "2026-10-01T00:00:00Z"   # 31 days
+        no.legs[2].last_trade = "2026-10-30T00:00:00Z"
+        mark_stale(no, NOW)
+        self.assertEqual(no.legs[1].days_since_trade, 31.0)
+        self.assertIn("stale_quotes", no.filter_reasons)
+
+    def test_recent_trades_are_not_stale(self):
+        ev = event([mkt("A", 0.40, 0.45), mkt("B", 0.40, 0.45)])
+        no = [o for o in analyze_event(ev, now=NOW) if o.strategy == "me_all_no"][0]
+        for leg in no.legs:
+            leg.last_trade = "2026-10-29T12:00:00Z"
+        mark_stale(no, NOW)
+        self.assertEqual(no.filter_reasons, [])
 
 
 if __name__ == "__main__":

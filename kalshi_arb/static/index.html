@@ -86,6 +86,8 @@ tbody tr:hover { background: var(--surface-2); }
 tbody tr.row-arb, tbody tr.row-arb:hover { background: var(--good-bg); box-shadow: inset 5px 0 0 var(--good); }
 tbody tr.row-review, tbody tr.row-review:hover { background: var(--warning-bg); box-shadow: inset 5px 0 0 var(--warning); }
 tbody tr.row-near { box-shadow: inset 5px 0 0 var(--warning); }
+tbody tr.row-filtered td { opacity: .6; }
+tbody tr.row-filtered { box-shadow: inset 5px 0 0 var(--border); }
 .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pill.arb { background: var(--good); color: #fff; }
 .pill.review { background: var(--warning); color: #1f1600; }
@@ -189,6 +191,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
           <option value="high">High only</option>
         </select>
         <label><input type="checkbox" id="f-unverified" checked> Show needs-review</label>
+        <label title="Baskets whose quotes are stale (no trade in 14+ days), whose outcome periods are already over, or whose prices imply an unlisted outcome"><input type="checkbox" id="f-filtered"> Show stale / outdated</label>
         <input type="search" id="f-search" placeholder="Filter by event or ticker" aria-label="Search">
       </div>
     </div>
@@ -237,6 +240,8 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       <dd>For threshold ladders like "Fed rate above 3.00% / above 3.25%", a higher strike can never be more likely than a lower one. Buying YES on the lower strike and NO on the higher strike pays at least $1 in every outcome. It's an arbitrage when the higher strike's YES bid is above the lower strike's YES ask.</dd>
       <dt>Costs &amp; sizing</dt>
       <dd>Prices are top-of-book asks (a NO ask is $1 − YES bid). Each leg is one order and pays the fees of the selected venue, currently <strong id="fee-desc">—</strong>. Choose the venue when starting the server with <code>--fees robinhood | robinhood-gold | kalshi</code>. Fees are charged when you buy; holding to settlement adds no closing trade. Size is capped by the thinnest leg's top-level depth. Payouts arrive at settlement, so annualized return uses the latest expiration in the basket.</dd>
+      <dt>Stale &amp; outdated filters</dt>
+      <dd>Some baskets look profitable only because their quotes can't be trusted, so they're hidden by default. A basket is hidden when (1) any leg hasn't traded in 14+ days (checked against each contract's last trade, for the top candidates), (2) its outcomes name periods that are already over, e.g. "Q4 2024" in a "when will the next recession start" set that stays open only because NBER dates recessions after the fact, or (3) its YES asks sum far below $1 (under 80¢) without strikes proving the outcomes are exhaustive. In that last case the market itself is pricing an outcome that isn't listed, such as "no recession". Tick <em>Show stale / outdated</em> to see them with the reason.</dd>
       <dt>Liquidity</dt>
       <dd>Each leg shows its bid-ask spread, contracts traded in the last 24 hours, and open interest. For the top candidates it also shows contracts offered within 5¢ of the best price. A basket's tier comes from its widest spread and the dollars you can deploy at the best prices: <strong>High</strong> ≤ 2¢ and ≥ $1,000, <strong>Medium</strong> ≤ 5¢ and ≥ $100, <strong>Low</strong> ≤ 10¢ and ≥ $10, otherwise <strong>Thin</strong>. <em>Full-book fill</em> reads each leg's full order book and buys basket after basket down the book while each one is still profitable after fees, which shows how much of an arbitrage is really capturable.</dd>
       <dt>Trading through Robinhood</dt>
@@ -259,6 +264,9 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     verify_exhaustive: ["warn", "⚠ verify exhaustive"],
     inactive_outcomes: ["warn", "⚠ inactive outcome"],
     no_depth: ["muted", "no depth"],
+    implied_missing_outcome: ["warn", "⚠ prices imply a missing outcome"],
+    past_period: ["warn", "⌛ outcome periods already over"],
+    stale_quotes: ["warn", "⏸ stale quotes"],
   };
   const STRAT_SHORT = { me_all_no: "All NO", me_all_yes: "All YES", ladder: "Ladder" };
 
@@ -284,19 +292,22 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     if (!b.baskets) return `<span class="neg">0 profitable</span>`;
     return `<span class="pos">${b.baskets.toLocaleString()} baskets</span><div class="liq">${usd(b.profit)} on ${usd(b.capital, 0)}</div>`;
   };
+  const isFiltered = (o) => !!o.filtered;
+  const showFiltered = () => $("#f-filtered").checked;
+  const visible = (o) => showFiltered() || !isFiltered(o);
   const needsReview = (o) => o.flags.some((f) => REVIEW_FLAGS.has(f));
   const flagBadges = (o) => o.flags.map((f) => FLAG_TEXT[f] ? `<span class="badge ${FLAG_TEXT[f][0]}">${FLAG_TEXT[f][1]}</span>` : "").join("") || `<span class="badge ok">✓ guaranteed</span>`;
   const eventCell = (o) => `<a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.event_title || o.event_ticker)}</a><div class="tick">${esc(o.event_ticker)}</div>`;
   const legsCell = (o) => {
     const legs = o.legs.slice(0, 6).map((l) => `<div><span class="side">${l.side.toUpperCase()}</span>${esc(l.label)} @ ${(l.price * 100).toFixed(0)}¢ <span class="tick">×${Math.floor(l.size).toLocaleString()}</span></div>` +
-      `<span class="liq-meta" title="Bid-ask spread · contracts traded in 24h · open interest${l.depth_5c != null ? " · contracts offered within 5¢ of best price" : ""}">spread ${l.spread == null ? "—" : (l.spread * 100).toFixed(1) + "¢"} · vol ${compact(l.volume_24h)} · OI ${compact(l.open_interest)}${l.depth_5c != null ? ` · ${compact(l.depth_5c)} within 5¢` : ""}</span>`).join("");
+      `<span class="liq-meta" title="Bid-ask spread · contracts traded in 24h · open interest${l.depth_5c != null ? " · contracts offered within 5¢ of best price" : ""}">spread ${l.spread == null ? "—" : (l.spread * 100).toFixed(1) + "¢"} · vol ${compact(l.volume_24h)} · OI ${compact(l.open_interest)}${l.depth_5c != null ? ` · ${compact(l.depth_5c)} within 5¢` : ""}${l.days_since_trade != null ? ` · last trade ${l.days_since_trade < 1 ? "today" : Math.round(l.days_since_trade) + "d ago"}` : l.last_trade === null && o.flags.includes("stale_quotes") ? " · never traded" : ""}</span>`).join("");
     return legs + (o.legs.length > 6 ? `<div class="tick">+ ${o.legs.length - 6} more legs</div>` : "");
   };
 
   // --- sortable table helper ---------------------------------------------
   const NEAR = -0.02;  // within 2c of break-even after fees
-  const oppClass = (o) => o.is_arb ? (needsReview(o) ? "review" : "arb") : o.net_edge >= NEAR && o.max_baskets > 0 ? "near" : "far";
-  const rowClassOf = (o) => ({ arb: "row-arb", review: "row-review", near: "row-near" }[oppClass(o)] || "");
+  const oppClass = (o) => o.filtered ? "far" : o.is_arb ? (needsReview(o) ? "review" : "arb") : o.net_edge >= NEAR && o.max_baskets > 0 ? "near" : "far";
+  const rowClassOf = (o) => isFiltered(o) ? "row-filtered" : ({ arb: "row-arb", review: "row-review", near: "row-near" }[oppClass(o)] || "");
 
   function renderTable(el, key, cols, rows, emptyHtml, rowClass) {
     const [sk, dir] = state.sort[key];
@@ -340,7 +351,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     const d = state.data; if (!d) return [];
     const strat = $("#f-strategy").value, q = $("#f-search").value.trim().toLowerCase(), showRev = $("#f-unverified").checked;
     const minTier = $("#f-liquidity").value;
-    return d.opportunities.filter((o) =>
+    return d.opportunities.filter((o) => visible(o) &&
       (!minTier || TIER_RANK[liqOf(o).tier] >= TIER_RANK[minTier]) &&
       (!arbOnly || o.is_arb) && (!strat || o.strategy === strat) && (!arbOnly || showRev || !needsReview(o)) &&
       (!q || (o.event_title + " " + o.event_ticker + " " + o.legs.map((l) => l.ticker).join(" ")).toLowerCase().includes(q)));
@@ -351,10 +362,12 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   function renderKpis() {
     const d = state.data, k = $("#kpis");
     if (!d) { k.innerHTML = ""; return; }
-    const arbs = d.opportunities.filter((o) => o.is_arb);
+    const arbs = d.opportunities.filter((o) => o.is_arb && !isFiltered(o));
+    const hidden = d.opportunities.filter((o) => isFiltered(o));
+    const hiddenArbs = hidden.filter((o) => o.is_arb).length;
     const sure = arbs.filter((o) => !needsReview(o));
     const review = arbs.length - sure.length;
-    const best = d.opportunities.filter((o) => !needsReview(o) && o.max_baskets > 0)[0];
+    const best = d.opportunities.filter((o) => !needsReview(o) && !isFiltered(o) && o.max_baskets > 0)[0];
     const total = sure.reduce((s, o) => s + o.net_profit, 0);
     const tiles = [
       ["Guaranteed arbitrages", sure.length.toLocaleString(), review ? `${review} more need rule review` : `after ${feeLabel()} fees`],
@@ -367,16 +380,17 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     k.innerHTML = tiles.map(([l, v, n], i) => `<div class="tile ${tileCls[i]}"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${esc(n)}</div></div>`).join("");
 
     const ban = $("#banner");
-    const near = d.opportunities.filter((o) => oppClass(o) === "near").length;
+    const near = d.opportunities.filter((o) => !isFiltered(o) && oppClass(o) === "near").length;
+    const hiddenNote = hidden.length ? ` ${hidden.length} stale or outdated ${hidden.length === 1 ? "basket" : "baskets"} hidden${hiddenArbs ? ` (${hiddenArbs} would look profitable)` : ""}. Tick “Show stale / outdated” to see ${hidden.length === 1 ? "it" : "them"}.` : "";
     if (sure.length) {
       ban.className = "banner arb";
-      ban.innerHTML = `<span class="icon">✅</span><div><div class="headline">${sure.length} guaranteed arbitrage ${sure.length === 1 ? "opportunity" : "opportunities"}: ${usd(total)} capturable</div><div class="detail">Best: ${cents(sure[0].net_edge)} per basket on ${esc(sure[0].event_title || sure[0].event_ticker)}, after ${esc(feeLabel())} fees. Highlighted in green below.</div></div>`;
+      ban.innerHTML = `<span class="icon">✅</span><div><div class="headline">${sure.length} guaranteed arbitrage ${sure.length === 1 ? "opportunity" : "opportunities"}: ${usd(total)} capturable</div><div class="detail">Best: ${cents(sure[0].net_edge)} per basket on ${esc(sure[0].event_title || sure[0].event_ticker)}, after ${esc(feeLabel())} fees. Highlighted in green below.${hiddenNote}</div></div>`;
     } else if (review) {
       ban.className = "banner review";
-      ban.innerHTML = `<span class="icon">⚠️</span><div><div class="headline">${review} possible ${review === 1 ? "opportunity needs" : "opportunities need"} a rules check</div><div class="detail">Profitable only if the listed outcomes cover every possibility. Highlighted in amber below.${best ? ` Best fully guaranteed basket: ${cents(best.net_edge)}.` : ""}</div></div>`;
+      ban.innerHTML = `<span class="icon">⚠️</span><div><div class="headline">${review} possible ${review === 1 ? "opportunity needs" : "opportunities need"} a rules check</div><div class="detail">Profitable only if the listed outcomes cover every possibility. Highlighted in amber below.${best ? ` Best fully guaranteed basket: ${cents(best.net_edge)}.` : ""}${hiddenNote}</div></div>`;
     } else {
       ban.className = "banner none";
-      ban.innerHTML = `<span class="icon">🔍</span><div><div class="headline">No arbitrage right now</div><div class="detail">${best ? `Closest guaranteed basket is ${cents(best.net_edge)} per basket after fees (${STRAT_SHORT[best.strategy]} · ${esc(best.event_title || best.event_ticker)}).` : ""}${near ? ` ${near} near break-even.` : ""}</div></div>`;
+      ban.innerHTML = `<span class="icon">🔍</span><div><div class="headline">No arbitrage right now</div><div class="detail">${best ? `Closest guaranteed basket is ${cents(best.net_edge)} per basket after fees (${STRAT_SHORT[best.strategy]} · ${esc(best.event_title || best.event_ticker)}).` : ""}${near ? ` ${near} near break-even.` : ""}${hiddenNote}</div></div>`;
     }
   }
 
@@ -452,7 +466,8 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     const cols = [
       { key: "title", label: "Event", cls: "event", render: (e) => `<a href="https://kalshi.com/markets/${esc(e.series_ticker.toLowerCase())}" target="_blank" rel="noopener">${esc(e.title)}</a><div class="tick">${esc(e.event_ticker)}</div>` },
       { key: "outcomes", label: "Outcomes", num: true, render: (e) => e.outcomes },
-      { key: "sum_yes_ask", label: "Σ YES ask", num: true, render: (e) => e.sum_yes_ask == null ? `<span class="tick">missing ask</span>` : (e.sum_yes_ask < 1 ? `<span class="pill ${e.exhaustive ? "arb" : "review"}" title="YES asks sum under $1">${usd(e.sum_yes_ask)}</span>` : usd(e.sum_yes_ask)) },
+      { key: "sum_yes_ask", label: "Σ YES ask", num: true, render: (e) => e.sum_yes_ask == null ? `<span class="tick">missing ask</span>` : (e.sum_yes_ask < 0.8 && !e.exhaustive ? `${usd(e.sum_yes_ask)} <span class="badge muted" title="Far below $1: the market is pricing in an outcome that isn't listed">implies missing outcome</span>`
+        : e.sum_yes_ask < 1 ? `<span class="pill ${e.exhaustive ? "arb" : "review"}" title="YES asks sum under $1">${usd(e.sum_yes_ask)}</span>` : usd(e.sum_yes_ask)) },
       { key: "sum_yes_bid", label: "Σ YES bid", num: true, render: (e) => e.sum_yes_bid > 1 ? `<span class="pill arb" title="YES bids sum over $1: buy every NO">${usd(e.sum_yes_bid)}</span>` : usd(e.sum_yes_bid) },
       { key: "spread", label: "Book width", num: true, sortVal: (e) => e.sum_yes_ask == null ? null : e.sum_yes_ask - e.sum_yes_bid, render: (e) => e.sum_yes_ask == null ? "—" : cents(e.sum_yes_ask - e.sum_yes_bid).replace("+", "") },
       { key: "exhaustive", label: "Coverage", render: (e) => e.exhaustive ? `<span class="badge ok">✓ strikes cover all</span>` : `<span class="badge muted">check rules</span>` },
@@ -549,7 +564,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     setTimeout(poll, delay);
   }
 
-  ["#f-strategy", "#f-liquidity", "#f-unverified", "#f-search"].forEach((s) => $(s).addEventListener("input", render));
+  ["#f-strategy", "#f-liquidity", "#f-unverified", "#f-filtered", "#f-search"].forEach((s) => $(s).addEventListener("input", render));
   $("#me-search").addEventListener("input", renderMe);
   document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
     state.view = b.dataset.view;

@@ -96,6 +96,10 @@ class KalshiClient:
     def orderbook(self, ticker: str) -> dict:
         return self.get(f"/markets/{urllib.parse.quote(ticker)}/orderbook")
 
+    def last_trade_time(self, ticker: str) -> str | None:
+        trades = self.get("/markets/trades", {"ticker": ticker, "limit": 1}).get("trades") or []
+        return trades[0].get("created_time") if trades else None
+
     def open_events_with_markets(self, series_ticker: str) -> list[dict]:
         return list(self.paginate(
             "/events", "events",
