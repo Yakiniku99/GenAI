@@ -83,6 +83,33 @@ th.num, td.num { text-align: right; }
 th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; }
 th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; }
 tbody tr:hover { background: var(--surface-2); }
+tbody tr.row-arb, tbody tr.row-arb:hover { background: var(--good-bg); box-shadow: inset 5px 0 0 var(--good); }
+tbody tr.row-review, tbody tr.row-review:hover { background: var(--warning-bg); box-shadow: inset 5px 0 0 var(--warning); }
+tbody tr.row-near { box-shadow: inset 5px 0 0 var(--warning); }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pill.arb { background: var(--good); color: #fff; }
+.pill.review { background: var(--warning); color: #1f1600; }
+.pill.near { background: var(--warning-bg); color: var(--warning-ink); border: 1px solid var(--warning); }
+.pill.far { background: var(--surface-2); color: var(--text-secondary); font-weight: 500; }
+.banner { display: flex; align-items: center; gap: 14px; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; border: 1px solid var(--border); background: var(--surface-1); }
+.banner .icon { font-size: 26px; line-height: 1; flex: none; }
+.banner .headline { font-size: 18px; font-weight: 700; }
+.banner .detail { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
+.banner.arb { background: var(--good-bg); border-color: var(--good); box-shadow: inset 6px 0 0 var(--good); }
+.banner.arb .headline { color: var(--good-ink); }
+.banner.review { background: var(--warning-bg); border-color: var(--warning); box-shadow: inset 6px 0 0 var(--warning); }
+.banner.review .headline { color: var(--warning-ink); }
+.banner.none { box-shadow: inset 6px 0 0 var(--text-muted); }
+.tile.arb { background: var(--good-bg); border-color: var(--good); }
+.tile.arb .value { color: var(--good-ink); }
+.tile.review { background: var(--warning-bg); border-color: var(--warning); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 10px 16px 0; font-size: 12px; color: var(--text-secondary); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.btn-primary:hover { filter: brightness(1.08); }
+a.btn { display: inline-block; text-decoration: none; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 14px; }
+a.btn:hover { border-color: var(--accent); }
+#refresh-msg { font-size: 12px; color: var(--text-secondary); }
 td.event { white-space: normal; min-width: 220px; max-width: 360px; }
 td.event a { color: var(--text-primary); text-decoration: none; font-weight: 500; }
 td.event a:hover { text-decoration: underline; }
@@ -130,11 +157,15 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     </div>
     <div class="status">
       <span id="status"><span class="dot"></span>Connecting…</span>
-      <button id="refresh" type="button">Rescan now</button>
+      <button id="refresh" type="button" class="btn-primary">↻ Rescan now</button>
+      <a id="run-scan" class="btn" target="_blank" rel="noopener" hidden title="Starts a fresh Kalshi scan on GitHub Actions (repo owner only). This page picks it up in about 4 minutes.">Run new scan ↗</a>
+      <span id="refresh-msg" role="status" aria-live="polite"></span>
     </div>
   </header>
 
   <div class="error" id="error"></div>
+
+  <div class="banner none" id="banner" role="status" aria-live="polite"><span class="icon">…</span><div><div class="headline">Loading…</div></div></div>
 
   <section class="kpis" id="kpis" aria-label="Summary"></section>
 
@@ -174,6 +205,11 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
         <button type="button" data-view="chart" aria-pressed="true">Chart</button>
         <button type="button" data-view="table" aria-pressed="false">Table</button>
       </div>
+    </div>
+    <div class="legend" id="near-legend">
+      <span><i style="background:var(--good)"></i>✓ Arbitrage (profit after fees)</span>
+      <span><i style="background:var(--warning)"></i>Near: within 2¢ of break-even</span>
+      <span><i style="background:var(--series-1)"></i>Further away</span>
     </div>
     <div class="chart-box" id="near-chart"></div>
     <div class="scroll" id="near-table-wrap" hidden><table id="near-table"></table></div>
@@ -258,7 +294,11 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   };
 
   // --- sortable table helper ---------------------------------------------
-  function renderTable(el, key, cols, rows, emptyHtml) {
+  const NEAR = -0.02;  // within 2c of break-even after fees
+  const oppClass = (o) => o.is_arb ? (needsReview(o) ? "review" : "arb") : o.net_edge >= NEAR && o.max_baskets > 0 ? "near" : "far";
+  const rowClassOf = (o) => ({ arb: "row-arb", review: "row-review", near: "row-near" }[oppClass(o)] || "");
+
+  function renderTable(el, key, cols, rows, emptyHtml, rowClass) {
     const [sk, dir] = state.sort[key];
     const col = cols.find((c) => c.key === sk) || cols[0];
     const val = col.sortVal || ((r) => r[col.key]);
@@ -269,7 +309,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     });
     const head = cols.map((c) => `<th data-key="${c.key}" class="${c.num ? "num" : ""}" ${c.key === sk ? `aria-sort="${dir > 0 ? "ascending" : "descending"}"` : ""} scope="col">${c.label}</th>`).join("");
     const body = rows.length
-      ? rows.map((r) => `<tr>${cols.map((c) => `<td class="${c.cls || ""} ${c.num ? "num" : ""}">${c.render(r)}</td>`).join("")}</tr>`).join("")
+      ? rows.map((r) => `<tr class="${rowClass ? rowClass(r) : ""}">${cols.map((c) => `<td class="${c.cls || ""} ${c.num ? "num" : ""}">${c.render(r)}</td>`).join("")}</tr>`).join("")
       : `<tr><td colspan="${cols.length}">${emptyHtml}</td></tr>`;
     el.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
     el.querySelectorAll("th").forEach((th) => th.addEventListener("click", () => {
@@ -285,7 +325,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     { key: "legs", label: "Legs to buy", cls: "legs", render: legsCell, sortVal: (o) => o.legs.length },
     { key: "cost", label: "Cost", num: true, render: (o) => usd(o.cost) },
     { key: "guaranteed_payout", label: "Min payout", num: true, render: (o) => usd(o.guaranteed_payout) },
-    { key: "net_edge", label: "Net edge / basket", num: true, render: (o) => `<span class="${o.net_edge > 0 ? "pos" : "neg"}">${cents(o.net_edge)}</span>` },
+    { key: "net_edge", label: "Net edge / basket", num: true, render: (o) => `<span class="pill ${oppClass(o)}">${cents(o.net_edge)}</span>` },
     { key: "max_baskets", label: "Max baskets", num: true, render: (o) => o.max_baskets.toLocaleString() },
     { key: "liquidity", label: "Liquidity", render: liquidityCell, sortVal: (o) => TIER_RANK[liqOf(o).tier] * 1e9 + liqOf(o).top_depth_usd },
     { key: "book", label: "Full-book fill", num: true, render: bookCell, sortVal: (o) => liqOf(o).book ? liqOf(o).book.profit : null },
@@ -323,14 +363,28 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       ["Baskets evaluated", d.opportunities.length.toLocaleString(), `${d.events_scanned.toLocaleString()} events`],
       ["Markets scanned", d.markets_scanned.toLocaleString(), `${d.series_with_open_events} live series of ${d.series_scanned}`],
     ];
-    k.innerHTML = tiles.map(([l, v, n]) => `<div class="tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${esc(n)}</div></div>`).join("");
+    const tileCls = [sure.length ? "arb" : review ? "review" : "", sure.length ? "arb" : "", best && best.net_edge > 0 ? "arb" : "", "", ""];
+    k.innerHTML = tiles.map(([l, v, n], i) => `<div class="tile ${tileCls[i]}"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${esc(n)}</div></div>`).join("");
+
+    const ban = $("#banner");
+    const near = d.opportunities.filter((o) => oppClass(o) === "near").length;
+    if (sure.length) {
+      ban.className = "banner arb";
+      ban.innerHTML = `<span class="icon">✅</span><div><div class="headline">${sure.length} guaranteed arbitrage ${sure.length === 1 ? "opportunity" : "opportunities"}: ${usd(total)} capturable</div><div class="detail">Best: ${cents(sure[0].net_edge)} per basket on ${esc(sure[0].event_title || sure[0].event_ticker)}, after ${esc(feeLabel())} fees. Highlighted in green below.</div></div>`;
+    } else if (review) {
+      ban.className = "banner review";
+      ban.innerHTML = `<span class="icon">⚠️</span><div><div class="headline">${review} possible ${review === 1 ? "opportunity needs" : "opportunities need"} a rules check</div><div class="detail">Profitable only if the listed outcomes cover every possibility. Highlighted in amber below.${best ? ` Best fully guaranteed basket: ${cents(best.net_edge)}.` : ""}</div></div>`;
+    } else {
+      ban.className = "banner none";
+      ban.innerHTML = `<span class="icon">🔍</span><div><div class="headline">No arbitrage right now</div><div class="detail">${best ? `Closest guaranteed basket is ${cents(best.net_edge)} per basket after fees (${STRAT_SHORT[best.strategy]} · ${esc(best.event_title || best.event_ticker)}).` : ""}${near ? ` ${near} near break-even.` : ""}</div></div>`;
+    }
   }
 
   function renderArbs() {
     const rows = filteredOpps(true);
     const total = state.data ? state.data.opportunities.length : 0;
     renderTable($("#arb-table"), "arb", oppCols, rows,
-      `<div class="empty"><strong>No arbitrage right now</strong>${total ? `All ${total.toLocaleString()} candidate baskets cost at least their guaranteed payout after fees. The closest ones are in the next panel.` : "Waiting for the first scan…"}</div>`);
+      `<div class="empty"><strong>No arbitrage right now</strong>${total ? `All ${total.toLocaleString()} candidate baskets cost at least their guaranteed payout after fees. The closest ones are in the next panel.` : "Waiting for the first scan…"}</div>`, rowClassOf);
   }
 
   // --- near-miss chart: horizontal bars of net edge (¢), zero baseline -----
@@ -356,7 +410,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     rows.forEach((r, i) => {
       const v = r.net_edge * 100, yb = top + i * rowH, barH = narrow ? 12 : 14, by = yb + (narrow ? 22 : (rowH - barH) / 2);
       const x0 = x(Math.min(0, v)), x1 = x(Math.max(0, v)), w = Math.max(x1 - x0, 2);
-      const fill = r.is_arb && !needsReview(r) ? "var(--good)" : "var(--series-1)";
+      const fill = { arb: "var(--good)", review: "var(--warning)", near: "var(--warning)" }[oppClass(r)] || "var(--series-1)";
       const name = `${STRAT_SHORT[r.strategy]} · ${r.event_title || r.event_ticker}`;
       if (narrow) s += `<text class="bar-label" x="${plotL}" y="${yb + 14}">${esc(trunc(name, 48))}</text>`;
       else s += `<text class="bar-label" x="${labelW}" y="${by + barH / 2 + 4}" text-anchor="end">${esc(trunc(name, 44))}</text>`;
@@ -388,7 +442,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
 
   function renderNearTable() {
     renderTable($("#near-table"), "near", oppCols.filter((c) => !["roi", "annualized_roi"].includes(c.key)),
-      nearRows(), `<div class="empty">No candidates match the filters.</div>`);
+      nearRows(), `<div class="empty">No candidates match the filters.</div>`, rowClassOf);
   }
 
   function renderMe() {
@@ -398,8 +452,8 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     const cols = [
       { key: "title", label: "Event", cls: "event", render: (e) => `<a href="https://kalshi.com/markets/${esc(e.series_ticker.toLowerCase())}" target="_blank" rel="noopener">${esc(e.title)}</a><div class="tick">${esc(e.event_ticker)}</div>` },
       { key: "outcomes", label: "Outcomes", num: true, render: (e) => e.outcomes },
-      { key: "sum_yes_ask", label: "Σ YES ask", num: true, render: (e) => e.sum_yes_ask == null ? `<span class="tick">missing ask</span>` : `<span class="${e.sum_yes_ask < 1 ? "pos" : ""}">${usd(e.sum_yes_ask)}</span>` },
-      { key: "sum_yes_bid", label: "Σ YES bid", num: true, render: (e) => `<span class="${e.sum_yes_bid > 1 ? "pos" : ""}">${usd(e.sum_yes_bid)}</span>` },
+      { key: "sum_yes_ask", label: "Σ YES ask", num: true, render: (e) => e.sum_yes_ask == null ? `<span class="tick">missing ask</span>` : (e.sum_yes_ask < 1 ? `<span class="pill ${e.exhaustive ? "arb" : "review"}" title="YES asks sum under $1">${usd(e.sum_yes_ask)}</span>` : usd(e.sum_yes_ask)) },
+      { key: "sum_yes_bid", label: "Σ YES bid", num: true, render: (e) => e.sum_yes_bid > 1 ? `<span class="pill arb" title="YES bids sum over $1: buy every NO">${usd(e.sum_yes_bid)}</span>` : usd(e.sum_yes_bid) },
       { key: "spread", label: "Book width", num: true, sortVal: (e) => e.sum_yes_ask == null ? null : e.sum_yes_ask - e.sum_yes_bid, render: (e) => e.sum_yes_ask == null ? "—" : cents(e.sum_yes_ask - e.sum_yes_bid).replace("+", "") },
       { key: "exhaustive", label: "Coverage", render: (e) => e.exhaustive ? `<span class="badge ok">✓ strikes cover all</span>` : `<span class="badge muted">check rules</span>` },
       { key: "volume_24h", label: "24h volume", num: true, render: (e) => Math.round(e.volume_24h).toLocaleString() },
@@ -410,13 +464,19 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   function renderStatus(s) {
     const st = $("#status"), btn = $("#refresh");
     if (state.mode === "file" || s.static) {
-      st.innerHTML = `<span class="dot"></span>Snapshot from ${state.data ? `${ago(state.data.generated_at)} (${new Date(state.data.generated_at).toLocaleString()})` : "—"}`;
-      btn.hidden = true;
+      st.innerHTML = `<span class="dot${state.mode === "file" ? " live" : ""}"></span>${state.mode === "file" ? "Scan from" : "Demo data from"} ${state.data ? `${ago(state.data.generated_at)} (${new Date(state.data.generated_at).toLocaleString()})` : "—"}`;
+      // Static hosting: Refresh re-loads the newest published scan. Demo snapshots never change.
+      btn.hidden = state.mode !== "file";
+      btn.textContent = "↻ Refresh";
+      btn.disabled = false;
+      const gh = githubRepo();
+      if (state.mode === "file" && gh) { $("#run-scan").hidden = false; $("#run-scan").href = `https://github.com/${gh}/actions/workflows/pages.yml`; }
       if (state.mode !== "file") return;
     } else if (s.scanning) {
       const p = s.progress; st.innerHTML = `<span class="dot busy"></span>Scanning ${p.total ? `${p.done}/${p.total} series` : "series list"}…` + (state.data ? ` · showing scan from ${ago(state.data.generated_at)}` : "");
-      btn.disabled = true;
+      btn.disabled = true; btn.textContent = "↻ Scanning…";
     } else if (state.data) {
+      btn.textContent = "↻ Rescan now";
       st.innerHTML = `<span class="dot live"></span>Updated ${ago(state.data.generated_at)} · ${state.data.scan_seconds}s scan` + (s.next_scan_in != null ? ` · next in ${Math.ceil(s.next_scan_in / 60)}m` : "");
       btn.disabled = false;
     }
@@ -436,6 +496,30 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     }
   }
 
+  // On GitHub Pages (<owner>.github.io/<repo>/) link to the workflow that rebuilds the scan.
+  function githubRepo() {
+    const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    const repo = location.pathname.split("/").filter(Boolean)[0];
+    return m && repo ? `${m[1]}/${repo}` : null;
+  }
+
+  let msgTimer;
+  function flash(text) {
+    const el = $("#refresh-msg"); el.textContent = text;
+    clearTimeout(msgTimer); msgTimer = setTimeout(() => { el.textContent = ""; }, 10000);
+  }
+
+  async function loadSnapshotFile() {
+    const src = new URLSearchParams(location.search).get("data") || "snapshot.json";
+    const r = await fetch(src + (src.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const snap = await r.json();
+    const changed = snap.generated_at !== lastGen;
+    if (changed) { state.data = snap; lastGen = snap.generated_at; render(); }
+    state.mode = "file"; renderStatus({});
+    return changed;
+  }
+
   let lastGen = null;
   async function poll() {
     let delay = 15000;
@@ -451,13 +535,8 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       }
     } catch (e) {
       // No server: fall back to a static snapshot file (?data=… or snapshot.json).
-      const src = new URLSearchParams(location.search).get("data") || "snapshot.json";
       try {
-        const r = await fetch(src, { cache: "no-store" });
-        if (!r.ok) throw new Error(r.status);
-        const snap = await r.json();
-        if (snap.generated_at !== lastGen) { state.data = snap; lastGen = snap.generated_at; render(); }
-        state.mode = "file"; renderStatus({});
+        await loadSnapshotFile();
         setTimeout(poll, 300000);  // static hosting (e.g. GitHub Pages): pick up rebuilt snapshots
         return;
       } catch (_) {
@@ -479,7 +558,20 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     render();
   }));
   $("#refresh").addEventListener("click", async () => {
-    $("#refresh").disabled = true;
+    const btn = $("#refresh");
+    btn.disabled = true;
+    if (state.mode === "file") {
+      btn.textContent = "↻ Refreshing…";
+      try {
+        const changed = await loadSnapshotFile();
+        const next = new Date(new Date(state.data.generated_at).getTime() + 30 * 60000);
+        flash(changed ? `Loaded a newer scan (from ${ago(state.data.generated_at)}).`
+          : `Already the latest scan. ${next > new Date() ? `Next automatic scan around ${next.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "A new automatic scan is due any minute"}${githubRepo() ? ", or use Run new scan" : ""}.`);
+      } catch (_) { flash("Couldn't reach the published scan. Try again in a moment."); }
+      btn.textContent = "↻ Refresh"; btn.disabled = false;
+      return;
+    }
+    flash("Rescanning Kalshi…");
     try { await fetch("api/refresh", { method: "POST" }); } catch (_) {}
     setTimeout(poll, 500);
   });

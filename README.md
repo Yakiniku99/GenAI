@@ -44,7 +44,10 @@ docker build -t kalshi-arb . && docker run --rm -p 8000:8000 kalshi-arb
 2. Open **Actions → Publish dashboard → Run workflow**, or just push.
 3. The site appears at `https://<user>.github.io/<repo>/`.
 
-Scheduled runs only fire on the repo's default branch. To build the same static site locally, run
+On the hosted page, **↻ Refresh** loads the newest published scan. **Run new scan ↗** opens the workflow
+so the repo owner can start a fresh Kalshi scan; it shows up about 4 minutes later. (The browser can't
+query Kalshi directly because Kalshi's API blocks cross-site requests, so scanning runs in GitHub
+Actions or the local server.) Scheduled runs only fire on the repo's default branch. To build the same static site locally, run
 `python -m kalshi_arb build --out _site`.
 
 Fees default to Robinhood without Gold. Add `--fees robinhood-gold` or `--fees kalshi` to any command.
