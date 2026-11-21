@@ -36,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Fee schedule to net out: robinhood (default, no Gold), robinhood-gold, or kalshi (direct)")
     common.add_argument("--no-signals", dest="signals", action="store_false",
                         help="Skip the What moved / shark-watch signals (fewer API calls)")
+    common.add_argument("--no-earnings", dest="earnings", action="store_false",
+                        help="Skip the Earnings tab (company KPI ladders; ~400 extra API calls, skipped with --series)")
     common.add_argument("--depth", type=int, default=40, metavar="N",
                         help="Read full order books for the N best candidates (default: 40, 0 to skip)")
 
@@ -71,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if a.cmd == "scan":
-        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals)
+        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals, a.earnings and not a.series)
         if a.out:
             with open(a.out, "w") as f:
                 json.dump(snap, f, indent=1)
@@ -90,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "build":
         from .server import build_static_site
-        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals)
+        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals, a.earnings and not a.series)
         build_static_site(snap, a.out)
         print(f"wrote static dashboard to {a.out}/ ({snap['markets_scanned']} markets)", file=sys.stderr)
         return 0

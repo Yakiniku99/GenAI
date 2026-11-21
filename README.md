@@ -1,12 +1,14 @@
 # Kalshi Economics Signals
 
-A live dashboard over every open **Economics** market on [Kalshi](https://kalshi.com), with three views:
+A live dashboard over every open **Economics** market on [Kalshi](https://kalshi.com), with four views:
 
 * **What moved**: the biggest 24h repricings, each scored for whether it looks like **informed
   trading or noise**, plus a "shark watch" feed of large trades. The score is backed by a study of
   Kalshi's own trade tape, kept in the repo rather than on the page (see [Informed-flow research](#informed-flow-research)).
 * **Expectations**: market-implied forecasts in sections (**Interest rates**, **Housing**,
   **Inflation**, **Employment**, **Growth**), each with a one-year implied path where Kalshi lists one.
+* **Earnings**: the most liquid company KPI ladders Kalshi lists around earnings (comparable sales,
+  deliveries, subscribers, ...), and an **earnings calendar** (see [Earnings](#earnings)).
 * **Arbitrage**: baskets of contracts whose *guaranteed* settlement payout is worth more than
   what they cost to buy right now, after trading fees.
 
@@ -193,6 +195,30 @@ November" → Nov), with the 10–90% band.
   same strikes now and 24h ago. Cards are flagged **thin** when fewer than 5 strikes trade or more than
   15% of the probability falls outside them.
 
+## Earnings
+
+Kalshi has no EPS or revenue markets. Around earnings it lists "above X" ladders on figures a company
+reports with its results, tagged `KPIs` in Kalshi's series metadata (Walmart and Target comparable sales,
+Tesla deliveries, Spotify subscribers, airline load factors, ...). The tab reads each ladder as a
+probability distribution, exactly as on the Expectations tab, and keeps only the most liquid:
+
+| Filter | Rule |
+|---|---|
+| Strikes | At least 4 with a bid-ask spread of 10¢ or less |
+| Open interest | At least 500 contracts outstanding across those strikes |
+| Cap | The 30 ladders with the most open interest |
+
+Liquidity is tiered by that open interest: High ≥ 5,000, Medium ≥ 1,500, otherwise Low. The scan adds
+about 400 API calls (roughly 100 seconds). Skip it with `--no-earnings`; it is also skipped with `--series`.
+The live server refreshes it on full-discovery cycles only.
+
+**Calendar.** Report dates come from Nasdaq's public earnings calendar (no key needed), one request per
+weekday for the next four months. A date is matched to a ladder by stock symbol (the series ticker without
+`KX`, or without the trailing `A` for annual series) and by falling within about a month of the month in the
+Kalshi event ticker. Dates a company hasn't confirmed can move, and Nasdaq's endpoint is unofficial. If it
+can't be reached, or no date matches, a ladder is listed by the month in its Kalshi ticker, which is
+approximate, and the page says so.
+
 ## Informed-flow research
 
 ```bash
@@ -217,6 +243,7 @@ kalshi_arb/
   flow.py        trade/candle parsing and move features
   signals.py     "What moved" movers, informed-move score, shark-watch feed
   macro.py       implied distributions, Fed path, gauges
+  earnings.py    company KPI ladders, liquidity filter, Nasdaq earnings calendar
   research.py    the informed-flow study (writes research/ and informed_model.json)
   server.py      stdlib HTTP server + background rescan loop
   static/index.html  the dashboard (no external dependencies)

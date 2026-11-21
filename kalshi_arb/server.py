@@ -63,7 +63,12 @@ def _scan_loop(state: State, args) -> None:
                 state.progress = (done, total)
 
         try:
-            snap = scan(client, args.category, only, args.workers, progress, args.fees, args.depth, getattr(args, "signals", True))
+            # The earnings scan is ~400 requests; refresh it on full cycles and carry it over in between.
+            with_earnings = full and getattr(args, "earnings", True) and not args.series
+            snap = scan(client, args.category, only, args.workers, progress, args.fees, args.depth,
+                        getattr(args, "signals", True), with_earnings)
+            if not with_earnings and state.snapshot and not args.series:
+                snap["earnings"] = state.snapshot.get("earnings")
             snap["full_discovery"] = full
             active = sorted({o["series_ticker"] for o in snap["opportunities"]}
                             | set(snap["series_titles"]))

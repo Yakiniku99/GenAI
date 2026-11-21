@@ -11,6 +11,7 @@ from .arbitrage import (DEFAULT_FEE_MODEL, FEE_MODELS, Opportunity, Quote, analy
                         asks_from_orderbook, depth_within, mark_stale, strike_coverage_is_exhaustive,
                         walk_book)
 from .client import KalshiClient
+from .earnings import KPI_TAG, build_earnings
 from .macro import build_macro
 from .signals import build_signals
 
@@ -81,9 +82,13 @@ def add_book_depth(client: KalshiClient, opps: list[Opportunity], fee_model: str
 
 def fetch_open_events(client: KalshiClient, category: str = "Economics",
                       series_filter: list[str] | None = None, workers: int = 10,
-                      progress: ProgressFn | None = None) -> tuple[list[dict], list[dict], list[str]]:
-    """All open events (with nested markets) for every series in `category`."""
+                      progress: ProgressFn | None = None,
+                      tag: str | None = None) -> tuple[list[dict], list[dict], list[str]]:
+    """All open events (with nested markets) for every series in `category`,
+    optionally only the series carrying Kalshi metadata tag `tag`."""
     series = client.series(category)
+    if tag:
+        series = [s for s in series if tag in (s.get("tags") or [])]
     if series_filter:
         wanted = {s.upper() for s in series_filter}
         series = [s for s in series if s["ticker"].upper() in wanted]
@@ -112,6 +117,7 @@ def scan(
     fee_model: str = DEFAULT_FEE_MODEL,
     depth_candidates: int = 40,
     signals: bool = True,
+    earnings: bool = False,
 ) -> dict:
     client = client or KalshiClient()
     started = time.time()
@@ -131,6 +137,11 @@ def scan(
     if signals:
         sig, sig_errors = build_signals(client, events, workers=min(workers, 8), now=now)
         errors += sig_errors
+    earn = None
+    if earnings:
+        _, kpi_events, earn_errors = fetch_open_events(client, "Financials", None, workers, None, tag=KPI_TAG)
+        earn = build_earnings(kpi_events, now)
+        errors += earn_errors + earn["errors"]
     n_markets = sum(len(e.get("markets") or []) for e in events)
     return {
         "generated_at": now.isoformat(),
@@ -149,5 +160,6 @@ def scan(
         "mutually_exclusive_events": sorted(summaries, key=lambda s: -(s["volume_24h"] or 0)),
         "macro": macro,
         "signals": sig,
+        "earnings": earn,
         "errors": errors,
     }

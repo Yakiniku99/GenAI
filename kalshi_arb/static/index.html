@@ -185,7 +185,7 @@ a.btn:hover { border-color: var(--accent); }
 .cal-nav { display: flex; align-items: center; gap: 6px; }
 .cal-nav button { padding: 4px 10px; font-size: 13px; }
 .cal-nav button:disabled { opacity: .35; }
-#cal-title { min-width: 132px; text-align: center; font-weight: 600; }
+#cal-title, #ec-title { min-width: 132px; text-align: center; font-weight: 600; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--grid); border-top: 1px solid var(--grid); }
 .cal-grid .dow { background: var(--surface-2); font-size: 11px; color: var(--text-secondary); text-align: center; padding: 5px 0; font-weight: 600; }
 .cal-grid .day { background: var(--surface-1); min-height: 84px; padding: 5px 6px; display: flex; flex-direction: column; gap: 3px; min-width: 0; text-align: left; border: 0; border-radius: 0; font: inherit; color: inherit; }
@@ -291,6 +291,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   <nav class="tabs" role="tablist" aria-label="Views">
     <button role="tab" data-tab="moved" aria-selected="true">What moved <span class="count" id="moved-count"></span></button>
     <button role="tab" data-tab="macro" aria-selected="false">Expectations</button>
+    <button role="tab" data-tab="earn" aria-selected="false">Earnings <span class="count" id="earn-count"></span></button>
     <button role="tab" data-tab="arb" aria-selected="false">Arbitrage</button>
   </nav>
 
@@ -458,6 +459,39 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     <p class="note" style="padding:12px 0 0">Each Kalshi "above X" ladder is a probability distribution. The big number is its median, and the pill is the median's 24-hour change, measured on strikes that traded both now and then. Strikes with spreads over 10¢ are ignored. Path charts join the next releases with any year-end contract, plotted by the period each contract measures. Most monthly series are listed only one to three releases ahead. "Highest … this year" cards are the year's peak, not its level. CPI component cards are BLS index levels.</p>
   </div>
 
+  <div class="tab-panel" id="tab-earn" hidden>
+    <div id="earn-banner"></div>
+    <section class="kpis" id="earn-kpis" aria-label="Earnings summary"></section>
+    <section class="card cal-card" aria-label="Earnings calendar">
+      <div class="card-head">
+        <div>
+          <h2>Earnings calendar</h2>
+          <p>Report dates for companies Kalshi lists a KPI ladder on. Click a day to see which ladders it covers.</p>
+        </div>
+        <div class="cal-nav">
+          <button type="button" id="ec-prev" aria-label="Previous month">◀</button>
+          <span id="ec-title" aria-live="polite"></span>
+          <button type="button" id="ec-next" aria-label="Next month">▶</button>
+          <button type="button" id="ec-today">Today</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="ec-grid" role="grid"></div>
+      <div class="cal-day" id="ec-day" hidden></div>
+      <div class="cal-day" id="ec-undated" hidden></div>
+    </section>
+    <section class="card" id="earn-card">
+      <div class="card-head">
+        <div>
+          <h2>What Kalshi expects</h2>
+          <p>The most liquid KPI ladders, each read as a probability distribution: the median, the 10–90% range and how the median moved in 24 hours.</p>
+        </div>
+        <div class="filters"><label>Search <input id="earn-search" type="search" placeholder="Company or metric"></label></div>
+      </div>
+      <div class="scroll"><table id="earn-table"></table></div>
+      <p class="note" style="padding-top:12px">Kalshi has no EPS or revenue markets. Around earnings it lists "above X" ladders on figures a company reports with its results: comparable sales, deliveries, subscribers, load factors. A ladder is kept when at least 4 strikes have a spread of 10¢ or less and the contracts outstanding across those strikes total 500 or more; the 30 with the most open interest are shown. Report dates come from Nasdaq's public earnings calendar, matched by stock symbol to the month in the Kalshi ticker; dates the company hasn't confirmed can move. Without a match a ladder is listed by that month, which is approximate.</p>
+    </section>
+  </div>
+
   <footer id="footer">Data: Kalshi public market-data API. Not investment advice.</footer>
 </div>
 <div class="tooltip" id="tooltip"></div>
@@ -465,7 +499,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
 <script>
 (() => {
   const $ = (s) => document.querySelector(s);
-  const state = { data: null, mode: "api", sort: { arb: ["net_profit", -1], near: ["net_edge", -1], me: ["volume_24h", -1] }, view: "chart" };
+  const state = { data: null, mode: "api", sort: { arb: ["net_profit", -1], near: ["net_edge", -1], me: ["volume_24h", -1], earn: ["date", 1] }, view: "chart" };
   const REVIEW_FLAGS = new Set(["verify_exhaustive", "inactive_outcomes"]);
   const FLAG_TEXT = {
     verify_exhaustive: ["warn", "⚠ verify exhaustive"],
@@ -715,6 +749,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     if (name === "arb" && state.view === "chart") renderNearChart();
     if (name === "macro") renderMacro();
     if (name === "moved") renderMoved();
+    if (name === "earn") renderEarn();
   }
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
@@ -1108,10 +1143,124 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   }
   $("#m-label").addEventListener("input", renderMoved);
 
+  // ---------- Earnings ----------
+  const ecal = { month: null, sel: null, items: [] };
+  const EARN_HOUR = { bmo: "before open", amc: "after close", dmh: "during market hours" };
+  const ymd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const monthName = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" }); };
+  const kpiNum = (v) => {
+    const a = Math.abs(v), t = (x, d) => x.toLocaleString(undefined, { maximumFractionDigits: d });
+    return a >= 1e9 ? t(v / 1e9, 2) + "B" : a >= 1e6 ? t(v / 1e6, 2) + "M" : a >= 1e4 ? t(v / 1e3, 1) + "k" : t(v, a < 100 ? 2 : 1);
+  };
+  const kpiFmt = (v, unit) => v == null ? "—" : unit === "%" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) + "%" : unit === "$" ? "$" + kpiNum(v) : kpiNum(v);
+  const reportSort = (it) => (it.report && it.report.date) || it.expected_month || "9999";
+
+  const earnCols = [
+    { key: "company", label: "Company · KPI", cls: "event", render: (it) => `<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.company)}</a><div>${esc(it.metric)}${it.period ? ` · ${esc(it.period)}` : ""}</div><div class="tick">${esc(it.event_ticker)}</div>` },
+    { key: "date", label: "Reports", sortVal: reportSort, render: (it) => {
+      const r = it.report;
+      if (r) return `${ymd(r.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}<div class="liq">${esc(EARN_HOUR[r.hour] || "")}</div>`;
+      return it.expected_month ? `<span title="Month from the Kalshi event ticker; the exact date isn't known">~${esc(monthName(it.expected_month))}</span>` : `<span class="tick">—</span>`;
+    } },
+    { key: "median", label: "Kalshi median", num: true, sortVal: (it) => it.dist.median, render: (it) => {
+      const d = it.dist, thin = d.low_confidence ? ` <span class="tag-thin" title="Few liquid strikes, or much of the probability falls outside them. Treat as rough.">thin</span>` : "";
+      return `<b>${kpiFmt(d.median, it.unit)}</b>${thin}<div class="liq">10–90% ${kpiFmt(d.p10, it.unit)} – ${kpiFmt(d.p90, it.unit)}</div>`;
+    } },
+    { key: "chg", label: "24h", num: true, sortVal: (it) => it.dist.change_24h ? it.dist.change_24h.median : null, render: (it) => {
+      const c = it.dist.change_24h;
+      if (!c) return `<span class="flat" title="No quotes on the same strikes 24 hours ago">—</span>`;
+      if (Math.abs(c.median) < 1e-9) return `<span class="flat">±0</span>`;
+      return `<span class="${c.median > 0 ? "up" : "down"}">${c.median > 0 ? "▲" : "▼"} ${kpiFmt(Math.abs(c.median), it.unit)}</span>`;
+    } },
+    { key: "liq", label: "Liquidity", sortVal: (it) => it.open_interest, render: (it) => {
+      const [cls, txt] = TIER_BADGE[it.tier];
+      return `<span class="badge ${cls}" title="Tier from open interest across the liquid strikes">${txt}</span><div class="liq">OI ${compact(it.open_interest)} · spread ${(it.median_spread * 100).toFixed(1)}¢ · ${it.strikes_used}/${it.strikes_total} strikes</div>`;
+    } },
+  ];
+
+  function renderEarn() {
+    const e = state.data && state.data.earnings;
+    $("#earn-count").textContent = e ? e.items.length : "";
+    if (!e) {
+      $("#earn-banner").innerHTML = `<div class="empty"><strong>No earnings data in this scan</strong>Earnings are skipped with <code>--series</code> or <code>--no-earnings</code>. Run a full scan to include them.</div>`;
+      $("#earn-kpis").innerHTML = ""; $("#earn-table").innerHTML = ""; $("#ec-grid").innerHTML = ""; $("#ec-day").hidden = $("#ec-undated").hidden = true;
+      return;
+    }
+    const cal = e.calendar, dated = e.items.filter((i) => i.report);
+    const warn = (head, detail) => `<div class="banner review"><span class="icon">⚠️</span><div><div class="headline">${head}</div><div class="detail">${detail}</div></div></div>`;
+    $("#earn-banner").innerHTML = !cal.entries
+      ? warn("Report dates unavailable", "Nasdaq's earnings calendar couldn't be reached in this scan, so ladders are listed by the month in their Kalshi ticker, which is approximate.")
+      : "";
+    const next = dated.map((i) => i.report.date).filter((d) => d >= dayKey(new Date())).sort()[0];
+    const top = e.items.slice().sort((a, b) => b.open_interest - a.open_interest)[0];
+    $("#earn-kpis").innerHTML = [
+      ["Liquid KPI ladders", e.items.length, `of ${e.ladders_found} Kalshi lists with 4+ tight strikes and 500+ contracts open`],
+      ["With a report date", `${dated.length} of ${e.items.length}`, `from Nasdaq's calendar, ${cal.entries.toLocaleString()} reports in the next 4 months`],
+      ["Next report", next ? ymd(next).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—", next ? esc(dated.filter((i) => i.report.date === next).map((i) => i.company.replace(/,? (Inc|Corporation|Company|Corp|Group|Limited|Holdings)\.?.*$/i, "")).join(", ")) : "No dated reports"],
+      ["Most liquid", top ? esc(top.company.replace(/,? (Inc|Corporation|Company|Corp|Group|Limited|Holdings)\.?.*$/i, "")) : "—", top ? `${esc(top.metric)} · OI ${compact(top.open_interest)}` : ""],
+    ].map(([l, v, n]) => `<div class="tile"><div class="label">${l}</div><div class="value"${typeof v === "string" && v.length > 9 ? ' style="font-size:20px"' : ""}>${v}</div><div class="note">${n}</div></div>`).join("");
+
+    const q = $("#earn-search").value.trim().toLowerCase();
+    const rows = e.items.filter((i) => !q || `${i.company} ${i.metric} ${i.period}`.toLowerCase().includes(q));
+    renderTable($("#earn-table"), "earn", earnCols, rows, `<div class="empty">No ladders match.</div>`);
+    ecal.items = e.items;
+    if (!ecal.month) {   // open on the month of the next report
+      const today = dayKey(new Date()), next = dated.map((i) => i.report.date).filter((d) => d >= today).sort()[0];
+      const t = next ? ymd(next) : new Date();
+      ecal.month = new Date(t.getFullYear(), t.getMonth(), 1);
+    }
+    renderEarnCal();
+  }
+
+  function renderEarnCal() {
+    const m = ecal.month, dated = ecal.items.filter((i) => i.report);
+    const first = new Date(), minM = new Date(first.getFullYear(), first.getMonth(), 1);
+    const last = dated.length ? ymd(dated.map((i) => i.report.date).sort().pop()) : minM;
+    const maxM = new Date(last.getFullYear(), last.getMonth(), 1);
+    $("#ec-title").textContent = m.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    $("#ec-prev").disabled = m <= minM; $("#ec-next").disabled = m >= maxM;
+    const byDay = {};
+    for (const i of dated) (byDay[i.report.date] = byDay[i.report.date] || []).push(i);
+    const start = new Date(m.getFullYear(), m.getMonth(), 1 - m.getDay()), todayK = dayKey(new Date());
+    let cells = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => `<div class="dow" role="columnheader">${d}</div>`).join("");
+    for (let n = 0; n < 42; n++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + n);
+      if (n >= 35 && d.getMonth() !== m.getMonth()) break;
+      const k = dayKey(d), evs = byDay[k] || [], out = d.getMonth() !== m.getMonth();
+      const chips = evs.slice(0, 3).map((i) => `<span class="chip">${esc(i.report.symbol)}</span>`).join("");
+      const more = evs.length > 3 ? `<span class="more">+${evs.length - 3} more</span>` : "";
+      cells += `<button type="button" class="day ${out ? "out" : ""} ${k === todayK ? "today" : ""} ${evs.length ? "has" : ""} ${ecal.sel === k ? "sel" : ""}" data-day="${k}" ${evs.length ? "" : "tabindex='-1'"} aria-label="${esc(d.toDateString() + (evs.length ? `: ${evs.length} report${evs.length > 1 ? "s" : ""}` : ""))}"><span class="n">${d.getDate()}</span>${chips}${more}${evs.length ? `<span class="cnt">${evs.length}</span>` : ""}</button>`;
+    }
+    $("#ec-grid").innerHTML = cells;
+    $("#ec-grid").style.display = dated.length ? "" : "none";   // nothing to place on a grid without report dates
+    document.querySelector(".cal-nav:has(#ec-prev)").style.visibility = dated.length ? "" : "hidden";
+
+    const li = (i) => `<li><a href="${esc(i.url)}" target="_blank" rel="noopener" title="${esc(i.metric)}"><span class="what">${esc(i.company)}<span class="per">${esc(i.period)}</span></span><span class="val">${kpiFmt(i.dist.median, i.unit)}</span></a></li>`;
+    const dayBox = $("#ec-day"), sel = ecal.sel ? byDay[ecal.sel] || [] : [];
+    dayBox.hidden = !sel.length;
+    if (sel.length) dayBox.innerHTML = `<h3>Reporting ${ymd(ecal.sel).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })} · Kalshi median shown</h3><ul>${sel.map(li).join("")}</ul>`;
+
+    const undated = ecal.items.filter((i) => !i.report && i.expected_month), months = [...new Set(undated.map((i) => i.expected_month))].sort();
+    const ub = $("#ec-undated");
+    ub.hidden = !undated.length;
+    if (undated.length) ub.innerHTML = `<h3>Date not confirmed · month from the Kalshi ticker, approximate</h3>` + months.map((mo) => `<h3 class="grp" style="padding:8px 0 4px">${esc(monthName(mo))}</h3><ul>${undated.filter((i) => i.expected_month === mo).map(li).join("")}</ul>`).join("");
+  }
+
+  $("#ec-grid").addEventListener("click", (ev) => {
+    const cell = ev.target.closest(".day.has"); if (!cell) return;
+    ecal.sel = cell.dataset.day; renderEarnCal();
+    $("#ec-day").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  $("#ec-prev").addEventListener("click", () => { ecal.month = new Date(ecal.month.getFullYear(), ecal.month.getMonth() - 1, 1); renderEarnCal(); });
+  $("#ec-next").addEventListener("click", () => { ecal.month = new Date(ecal.month.getFullYear(), ecal.month.getMonth() + 1, 1); renderEarnCal(); });
+  $("#ec-today").addEventListener("click", () => { const t = new Date(); ecal.month = new Date(t.getFullYear(), t.getMonth(), 1); ecal.sel = null; renderEarnCal(); });
+  $("#earn-search").addEventListener("input", renderEarn);
+
+
   function render() {
     renderKpis(); renderArbs(); renderMe();
     if (state.view === "chart") renderNearChart(); else renderNearTable();
-    renderMoved(); renderMacro();
+    renderMoved(); renderMacro(); renderEarn();
     if (state.data) {
       const fm = state.data.fee_model || { label: "Kalshi direct", description: "7% × P × (1−P) taker fee × series multiplier, per order" };
       $("#fee-label").textContent = `${fm.label} fees`;
@@ -1203,7 +1352,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   let rz, lastW = window.innerWidth;
   window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; if (state.view === "chart") renderNearChart(); renderMacro(); }, 150); });
   const initial = (location.hash || "").slice(1);
-  showTab(["arb", "moved", "macro"].includes(initial) ? initial : "moved");
+  showTab(["arb", "moved", "macro", "earn"].includes(initial) ? initial : "moved");
   poll();
 })();
 </script>
