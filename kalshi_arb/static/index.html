@@ -276,7 +276,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   <header>
     <div>
       <h1>Kalshi Economics Signals</h1>
-      <p class="sub">Arbitrage after <span id="fee-label">trading fees</span>, informed-flow signals and market-implied macro expectations from Kalshi's economics markets.</p>
+      <p class="sub">Market-implied macro expectations, informed-flow signals and an earnings tracker built on Kalshi's markets, plus an arbitrage scan.</p>
     </div>
     <div class="status">
       <span id="status"><span class="dot"></span>Connecting…</span>
@@ -1263,7 +1263,6 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     renderMoved(); renderMacro(); renderEarn();
     if (state.data) {
       const fm = state.data.fee_model || { label: "Kalshi direct", description: "7% × P × (1−P) taker fee × series multiplier, per order" };
-      $("#fee-label").textContent = `${fm.label} fees`;
       $("#fee-desc").textContent = `${fm.label}: ${fm.description}`;
       $("#footer").textContent = `Data: Kalshi public market-data API, category “${state.data.category}”, generated ${new Date(state.data.generated_at).toLocaleString()}. Fees: ${fm.label}. Not investment advice.`;
     }
