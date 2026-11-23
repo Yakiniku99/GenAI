@@ -219,6 +219,27 @@ Kalshi event ticker. Dates a company hasn't confirmed can move, and Nasdaq's end
 can't be reached, or no date matches, a ladder is listed by the month in its Kalshi ticker, which is
 approximate, and the page says so.
 
+**Stock price, side by side with the KPI.** Each ladder shows the stock's move over the last 24 hours next to
+the change in Kalshi's median, so you can see whether a shift in the KPI forecast came with a price move. A
+single day per name can't show cause and effect; read it as a snapshot. Prices come from Robinhood's public
+market-data endpoints (no login; unofficial, so they can change). They use the 24/7 five-minute bars, so
+pre-market, after-hours and overnight trades count, and the move runs from 24 hours ago to the latest trade.
+The stock is matched to the company by name, not just by ticker (Kalshi's `KXFA` is Ford, but `FA` is another
+company). Names Robinhood doesn't list, such as TSX-listed ones, show a dash. A price is flagged **stale**
+when the last trade is over 12 hours old, with the reason (weekend, or market holiday from the NYSE calendar
+in `prices.py`), and the page warns when half or more are stale. Prices refresh on every live-server cycle.
+
+**History and correlation.** Each scan saves every ladder's median and stock price, plus the S&P 500 ETF
+(SPY), to `history.json` (`--history FILE` to move it, `--no-history` to skip). Stock moves are measured
+beyond the market's, so a broad rally doesn't read as a KPI effect. The link is the Spearman rank correlation,
+which holds up to outliers and to the many days a KPI doesn't move, shown three ways: across companies over
+the latest 24 hours (available straight away), across every company-day saved (about three weeks to fill), and
+per company (about two weeks, 10 trading days). Each comes with a strength word and a flag when it can't be
+told apart from chance; below the minimum it shows "building". Daily readings use each trading day's last scan
+with a fresh price, so weekends and holidays are skipped. A correlation means the two moved together, not that
+the KPI moved the price. Every scan is kept for a week, then one per day for up to 180 days. On GitHub Pages
+the history is published as `history.json` next to the page, and the next build downloads it and adds to it.
+
 ## Informed-flow research
 
 ```bash
@@ -244,6 +265,8 @@ kalshi_arb/
   signals.py     "What moved" movers, informed-move score, shark-watch feed
   macro.py       implied distributions, Fed path, gauges
   earnings.py    company KPI ladders, liquidity filter, Nasdaq earnings calendar
+  prices.py      stock price moves (24h, extended hours) and stale-price flags
+  history.py     saved KPI and price history, KPI-to-price correlation
   research.py    the informed-flow study (writes research/ and informed_model.json)
   server.py      stdlib HTTP server + background rescan loop
   static/index.html  the dashboard (no external dependencies)

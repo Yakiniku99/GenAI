@@ -1155,6 +1155,8 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   const kpiFmt = (v, unit) => v == null ? "—" : unit === "%" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) + "%" : unit === "$" ? "$" + kpiNum(v) : kpiNum(v);
   const reportSort = (it) => (it.report && it.report.date) || it.expected_month || "9999";
 
+  const fmtR = (r) => (r > 0 ? "+" : r < 0 ? "−" : "") + Math.abs(r).toFixed(2);
+  const corrBadge = (c) => `<span class="${c.significant ? (c.r > 0 ? "up" : "down") : "flat"}" title="Spearman rank correlation of ${c.n} observations. ${c.significant ? "Unlikely to be chance (about 95% confidence)." : "Not distinguishable from chance."} Moving together is not proof that one drives the other."><b>${fmtR(c.r)}</b></span><div class="liq">${esc(c.strength)}${c.significant ? "" : " · n.s."} · ${c.n} days</div>`;
   const earnCols = [
     { key: "company", label: "Company · KPI", cls: "event", render: (it) => `<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.company)}</a><div>${esc(it.metric)}${it.period ? ` · ${esc(it.period)}` : ""}</div><div class="tick">${esc(it.event_ticker)}</div>` },
     { key: "date", label: "Reports", sortVal: reportSort, render: (it) => {
@@ -1166,17 +1168,48 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       const d = it.dist, thin = d.low_confidence ? ` <span class="tag-thin" title="Few liquid strikes, or much of the probability falls outside them. Treat as rough.">thin</span>` : "";
       return `<b>${kpiFmt(d.median, it.unit)}</b>${thin}<div class="liq">10–90% ${kpiFmt(d.p10, it.unit)} – ${kpiFmt(d.p90, it.unit)}</div>`;
     } },
-    { key: "chg", label: "24h", num: true, sortVal: (it) => it.dist.change_24h ? it.dist.change_24h.median : null, render: (it) => {
+    { key: "chg", label: "KPI 24h", num: true, sortVal: (it) => it.dist.change_24h ? it.dist.change_24h.median : null, render: (it) => {
       const c = it.dist.change_24h;
       if (!c) return `<span class="flat" title="No quotes on the same strikes 24 hours ago">—</span>`;
       if (Math.abs(c.median) < 1e-9) return `<span class="flat">±0</span>`;
-      return `<span class="${c.median > 0 ? "up" : "down"}">${c.median > 0 ? "▲" : "▼"} ${kpiFmt(Math.abs(c.median), it.unit)}</span>`;
+      return `<span class="${c.median > 0 ? "up" : "down"}">${c.median > 0 ? "▲" : "▼"} ${kpiFmt(Math.abs(c.median), it.unit)}</span><div class="liq">change in Kalshi median</div>`;
+    } },
+    { key: "px", label: "Stock 24h", num: true, sortVal: (it) => it.price && it.price.change_pct != null ? it.price.change_pct : null, render: (it) => {
+      const p = it.price;
+      if (!p) return `<span class="flat" title="No US listing found on Robinhood (for example TSX-listed names), or prices were unavailable in this scan">—</span>`;
+      const ch = p.change_pct == null ? `<span class="flat" title="Price history didn't reach back 24 hours">—</span>`
+        : Math.abs(p.change_pct) < 0.005 ? `<span class="flat">±0.00%</span>`
+        : `<span class="${p.change_pct > 0 ? "up" : "down"}">${p.change_pct > 0 ? "▲" : "▼"} ${Math.abs(p.change_pct).toFixed(2)}%</span>`;
+      const at = new Date(p.price_at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+      const flags = (p.stale ? ` <span class="tag-thin" title="Last trade ${esc(at)}, ${p.age_hours}h before this scan. Nothing has traded since: ${esc(p.stale_reason)}. The 24h move is not a fresh reading.">stale · ${esc(p.stale_reason)}</span>` : "")
+        + (p.halted ? ` <span class="tag-thin" title="Trading in this stock is halted">halted</span>` : "");
+      return `${ch}${flags}<div class="liq" title="Move from 24 hours ago to the last trade, pre-market and after-hours included. Last trade ${esc(at)}.">$${p.price.toLocaleString(undefined, { maximumFractionDigits: 2 })} · ${esc(p.symbol)}${p.session ? " · " + esc(p.session) : ""}</div>`;
+    } },
+    { key: "corr", label: "KPI ↔ price", num: true, sortVal: (it) => it.corr && it.corr.r != null ? it.corr.r : null, render: (it) => {
+      const c = it.corr;
+      if (!c) return `<span class="flat">—</span>`;
+      if (c.r == null) return c.flat
+        ? `<span class="flat" title="This KPI's median hasn't moved on enough days to measure a link.">no KPI moves</span>`
+        : `<span class="flat" title="Correlation of this company's daily KPI change and stock move beyond the market. Needs ${c.needed} days of history; ${c.n} so far.">building<div class="liq">${c.n}/${c.needed} days</div></span>`;
+      return corrBadge(c);
     } },
     { key: "liq", label: "Liquidity", sortVal: (it) => it.open_interest, render: (it) => {
       const [cls, txt] = TIER_BADGE[it.tier];
       return `<span class="badge ${cls}" title="Tier from open interest across the liquid strikes">${txt}</span><div class="liq">OI ${compact(it.open_interest)} · spread ${(it.median_spread * 100).toFixed(1)}¢ · ${it.strikes_used}/${it.strikes_total} strikes</div>`;
     } },
   ];
+
+  // How strongly KPI moves and stock moves go together: across companies today, and across the saved history.
+  function linkTile(e) {
+    const c = e.correlation;
+    if (!c) return ["KPI ↔ price link", "—", "Not in this scan"];
+    const x = c.cross_section, p = c.pooled, mkt = c.adjusted_for ? "beyond the market" : "raw stock move";
+    const today = x.r != null ? `${esc(x.strength)}${x.significant ? "" : ", not significant"} · ${x.n} companies today, ${mkt}`
+      : x.flat ? "KPI medians barely moved today" : `needs ${x.needed} companies with a fresh price and a KPI change (${x.n} today)`;
+    const hist = p.r != null ? ` · all history: ${fmtR(p.r)} over ${p.n} company-days${p.significant ? "" : ", not significant"}`
+      : ` · history: ${c.days} day${c.days === 1 ? "" : "s"} saved, needs ~3 weeks`;
+    return ["KPI ↔ price link", x.r != null ? fmtR(x.r) : "—", today + hist];
+  }
 
   function renderEarn() {
     const e = state.data && state.data.earnings;
@@ -1188,15 +1221,21 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     }
     const cal = e.calendar, dated = e.items.filter((i) => i.report);
     const warn = (head, detail) => `<div class="banner review"><span class="icon">⚠️</span><div><div class="headline">${head}</div><div class="detail">${detail}</div></div></div>`;
-    $("#earn-banner").innerHTML = !cal.entries
-      ? warn("Report dates unavailable", "Nasdaq's earnings calendar couldn't be reached in this scan, so ladders are listed by the month in their Kalshi ticker, which is approximate.")
+    const pr = e.prices, reasons = [...new Set(e.items.filter((i) => i.price && i.price.stale).map((i) => i.price.stale_reason))];
+    const stalePx = pr && pr.priced && pr.stale * 2 >= pr.priced
+      ? warn("Stock prices are stale", `${pr.stale} of ${pr.priced} prices haven't traded recently: ${esc(reasons.join("; "))}. The stock 24h column shows the last session's move, not a fresh one, so compare it with the KPI change with care.`)
       : "";
+    $("#earn-banner").innerHTML = (!cal.entries
+      ? warn("Report dates unavailable", "Nasdaq's earnings calendar couldn't be reached in this scan, so ladders are listed by the month in their Kalshi ticker, which is approximate.")
+      : "") + stalePx;
     const next = dated.map((i) => i.report.date).filter((d) => d >= dayKey(new Date())).sort()[0];
     const top = e.items.slice().sort((a, b) => b.open_interest - a.open_interest)[0];
     $("#earn-kpis").innerHTML = [
       ["Liquid KPI ladders", e.items.length, `of ${e.ladders_found} Kalshi lists with 4+ tight strikes and 500+ contracts open`],
       ["With a report date", `${dated.length} of ${e.items.length}`, `from Nasdaq's calendar, ${cal.entries.toLocaleString()} reports in the next 4 months`],
       ["Next report", next ? ymd(next).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—", next ? esc(dated.filter((i) => i.report.date === next).map((i) => i.company.replace(/,? (Inc|Corporation|Company|Corp|Group|Limited|Holdings)\.?.*$/i, "")).join(", ")) : "No dated reports"],
+      ["Stock prices", pr ? `${pr.priced} of ${e.items.length}` : "—", pr ? (pr.stale ? `${pr.stale} stale · ` : "") + `24h incl. pre-market and after-hours, as of ${new Date(pr.as_of).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : "Not in this scan"],
+      linkTile(e),
       ["Most liquid", top ? esc(top.company.replace(/,? (Inc|Corporation|Company|Corp|Group|Limited|Holdings)\.?.*$/i, "")) : "—", top ? `${esc(top.metric)} · OI ${compact(top.open_interest)}` : ""],
     ].map(([l, v, n]) => `<div class="tile"><div class="label">${l}</div><div class="value"${typeof v === "string" && v.length > 9 ? ' style="font-size:20px"' : ""}>${v}</div><div class="note">${n}</div></div>`).join("");
 

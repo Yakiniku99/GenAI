@@ -29,8 +29,13 @@ jobs:
           python-version: "3.12"
       - name: Unit tests
         run: python -m unittest discover -s tests
+      - name: Fetch the history published by the last build
+        run: |
+          # KPI and stock-price history lives on the site itself; this run adds to it.
+          # Missing on the first run, so a failure here is fine.
+          curl -fsSL "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/history.json" -o history.json || rm -f history.json
       - name: Scan Kalshi and build static site
-        run: python -m kalshi_arb build --out _site
+        run: python -m kalshi_arb build --out _site --history history.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

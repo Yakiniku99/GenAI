@@ -13,6 +13,7 @@ from .arbitrage import (DEFAULT_FEE_MODEL, FEE_MODELS, Opportunity, Quote, analy
 from .client import KalshiClient
 from .earnings import KPI_TAG, build_earnings
 from .macro import build_macro
+from .prices import refresh as refresh_prices
 from .signals import build_signals
 
 ProgressFn = Callable[[int, int], None]
@@ -141,6 +142,7 @@ def scan(
     if earnings:
         _, kpi_events, earn_errors = fetch_open_events(client, "Financials", None, workers, None, tag=KPI_TAG)
         earn = build_earnings(kpi_events, now)
+        refresh_prices(earn, now)
         errors += earn_errors + earn["errors"]
     n_markets = sum(len(e.get("markets") or []) for e in events)
     return {

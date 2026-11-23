@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
 import sys
 
 from .arbitrage import DEFAULT_FEE_MODEL, FEE_MODELS
 from .client import KalshiClient
+from .history import track
 from .scanner import scan
 
 
@@ -38,6 +41,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="Skip the What moved / shark-watch signals (fewer API calls)")
     common.add_argument("--no-earnings", dest="earnings", action="store_false",
                         help="Skip the Earnings tab (company KPI ladders; ~400 extra API calls, skipped with --series)")
+    common.add_argument("--history", default="history.json", metavar="FILE",
+                        help="Where to keep the KPI and stock-price history behind the correlation (default: history.json)")
+    common.add_argument("--no-history", dest="history", action="store_const", const=None,
+                        help="Don't save history; the correlation then uses only the latest 24h across companies")
     common.add_argument("--depth", type=int, default=40, metavar="N",
                         help="Read full order books for the N best candidates (default: 40, 0 to skip)")
 
@@ -74,6 +81,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "scan":
         snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals, a.earnings and not a.series)
+        if snap.get("earnings"):
+            track(snap["earnings"], a.history)
         if a.out:
             with open(a.out, "w") as f:
                 json.dump(snap, f, indent=1)
@@ -93,7 +102,11 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "build":
         from .server import build_static_site
         snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals, a.earnings and not a.series)
+        if snap.get("earnings"):
+            track(snap["earnings"], a.history)
         build_static_site(snap, a.out)
+        if a.history and os.path.exists(a.history):   # published with the site so the next build can continue it
+            shutil.copy(a.history, os.path.join(a.out, "history.json"))
         print(f"wrote static dashboard to {a.out}/ ({snap['markets_scanned']} markets)", file=sys.stderr)
         return 0
 

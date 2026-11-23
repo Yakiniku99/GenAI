@@ -18,6 +18,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .client import KalshiClient
+from .history import track
+from .prices import refresh as refresh_prices
 from .scanner import scan
 
 STATIC = Path(__file__).parent / "static"
@@ -69,6 +71,10 @@ def _scan_loop(state: State, args) -> None:
                         getattr(args, "signals", True), with_earnings)
             if not with_earnings and state.snapshot and not args.series:
                 snap["earnings"] = state.snapshot.get("earnings")
+                if snap["earnings"]:
+                    refresh_prices(snap["earnings"])   # prices move every cycle; ladders are refreshed on full ones
+            if snap.get("earnings"):
+                track(snap["earnings"], getattr(args, "history", None))
             snap["full_discovery"] = full
             active = sorted({o["series_ticker"] for o in snap["opportunities"]}
                             | set(snap["series_titles"]))
