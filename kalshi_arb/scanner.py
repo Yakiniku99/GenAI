@@ -142,7 +142,7 @@ def scan(
     if earnings:
         _, kpi_events, earn_errors = fetch_open_events(client, "Financials", None, workers, None, tag=KPI_TAG)
         earn = build_earnings(kpi_events, now)
-        refresh_prices(earn, now)
+        refresh_prices(earn)   # current time: the scan's own `now` is minutes old by here
         errors += earn_errors + earn["errors"]
     n_markets = sum(len(e.get("markets") or []) for e in events)
     return {
