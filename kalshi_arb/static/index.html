@@ -269,6 +269,20 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   .tile .value { font-size: 22px; }
   header { align-items: flex-start; }
 }
+.mk-group { margin: 22px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary); font-weight: 600; }
+.mk-head { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
+.mk-head h2 { font-size: 16px; }
+.mk-head .px { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mk-head .vol { margin-left: auto; font-size: 13px; color: var(--text-secondary); }
+.mk-card { margin-bottom: 14px; }
+.mk-table th { cursor: default; position: static; }
+.mk-table td { vertical-align: middle; }
+.mk-table .kind { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.mk-bar { display: block; width: 190px; height: 20px; }
+.mk-bar .rng { stroke: var(--series-1); stroke-width: 6; stroke-linecap: round; opacity: .35; }
+.mk-bar .med { stroke: var(--series-1); stroke-width: 2.5; }
+.mk-bar .spot { stroke: var(--text-primary); stroke-width: 1.5; stroke-dasharray: 2 2; }
+.mk-bar text { font-size: 9px; fill: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -276,7 +290,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   <header>
     <div>
       <h1>Kalshi Economics Signals</h1>
-      <p class="sub">Market-implied macro expectations, informed-flow signals and an earnings tracker built on Kalshi's markets, plus an arbitrage scan.</p>
+      <p class="sub">Market-implied macro expectations, informed-flow signals, an earnings tracker and index, commodity and currency distributions built on Kalshi's markets, plus an arbitrage scan.</p>
     </div>
     <div class="status">
       <span id="status"><span class="dot"></span>Connecting…</span>
@@ -292,6 +306,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     <button role="tab" data-tab="moved" aria-selected="true">What moved <span class="count" id="moved-count"></span></button>
     <button role="tab" data-tab="macro" aria-selected="false">Expectations</button>
     <button role="tab" data-tab="earn" aria-selected="false">Earnings <span class="count" id="earn-count"></span></button>
+    <button role="tab" data-tab="markets" aria-selected="false">Markets <span class="count" id="mk-count"></span></button>
     <button role="tab" data-tab="arb" aria-selected="false">Arbitrage</button>
   </nav>
 
@@ -490,6 +505,13 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
       <div class="scroll"><table id="earn-table"></table></div>
       <p class="note" style="padding-top:12px">Kalshi has no EPS or revenue markets. Around earnings it lists "above X" ladders on figures a company reports with its results: comparable sales, deliveries, subscribers, load factors. A ladder is kept when at least 4 strikes have a spread of 10¢ or less and the contracts outstanding across those strikes total 500 or more; the 30 with the most open interest are shown. Report dates come from Nasdaq's public earnings calendar, matched by stock symbol to the month in the Kalshi ticker; dates the company hasn't confirmed can move. Without a match a ladder is listed by that month, which is approximate.</p>
     </section>
+  </div>
+
+  <div class="tab-panel" id="tab-markets" hidden>
+    <div id="mk-banner"></div>
+    <section class="kpis" id="mk-kpis" aria-label="Markets summary"></section>
+    <div id="mk-groups"></div>
+    <p class="note">Kalshi lists "above X" ladders and "between X and Y" range sets on each of these prices, from the next hour to the end of next year. Each is read as a probability distribution for the price at that close: the median, the 10–90% range (the bar; the line marks today's price) and the chance the price finishes above where it trades now. Range sets keep only buckets with a spread of 10¢ or less and need those buckets to carry 80% of the probability; ladders need 3+ such strikes. <strong>1σ move</strong> is the 10–90% width ÷ 2.56, as a share of the price. <strong>Implied vol</strong> annualizes it over weekdays (÷ √(days/252)) so it can sit beside the market's own gauge (VIX, VXN, OVX, GVZ), and is shown only for horizons of a day or more with a confident ladder. <strong>Skew</strong> is positive when the downside tail is longer than the upside tail. Prices come from Yahoo Finance's public chart data (futures for oil, gold, silver, gas and copper), so they can differ slightly from the index or contract Kalshi settles on; a "stale" tag means the market is closed.</p>
   </div>
 
   <footer id="footer">Data: Kalshi public market-data API. Not investment advice.</footer>
@@ -750,6 +772,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
     if (name === "macro") renderMacro();
     if (name === "moved") renderMoved();
     if (name === "earn") renderEarn();
+    if (name === "markets") renderMarkets();
   }
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
@@ -1296,10 +1319,82 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   $("#earn-search").addEventListener("input", renderEarn);
 
 
+  // ---------- Markets: index, commodity and FX ladders ----------
+  const mkNum = (v, d, unit) => v == null ? "—" : (unit || "") + v.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  const mkPct = (v, d = 2) => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d) + "%";
+  const mkMove = (v) => v == null ? `<span class="flat">—</span>` : Math.abs(v) < 0.005 ? `<span class="flat">±0.00%</span>` : `<span class="${v > 0 ? "up" : "down"}">${v > 0 ? "▲" : "▼"} ${Math.abs(v).toFixed(2)}%</span>`;
+  const mkWhen = (p) => {
+    const d = new Date(p.close);
+    return p.kind === "year-end" || p.kind === "monthly" ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+      : d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  };
+  function rangeBar(p, spot, dec, unit) {
+    const lo0 = Math.min(p.p10, spot == null ? p.p10 : spot), hi0 = Math.max(p.p90, spot == null ? p.p90 : spot), pad = (hi0 - lo0) * 0.1 || 1;
+    const lo = lo0 - pad, hi = hi0 + pad, W = 190, x = (v) => 4 + (v - lo) / (hi - lo) * (W - 8);
+    return `<svg class="mk-bar" viewBox="0 0 ${W} 20" role="img" aria-label="Kalshi 10 to 90 percent range ${mkNum(p.p10, dec, unit)} to ${mkNum(p.p90, dec, unit)}, median ${mkNum(p.median, dec, unit)}${spot != null ? ", price now " + mkNum(spot, dec, unit) : ""}">
+      <line class="rng" x1="${x(p.p10)}" x2="${x(p.p90)}" y1="10" y2="10"/><line class="med" x1="${x(p.median)}" x2="${x(p.median)}" y1="3" y2="17"/>
+      ${spot != null ? `<line class="spot" x1="${x(spot)}" x2="${x(spot)}" y1="0" y2="20"/>` : ""}</svg>`;
+  }
+  const skewCell = (k) => k == null ? `<span class="flat">—</span>`
+    : `<span title="Positive: the downside tail is longer than the upside tail (the market leans toward bigger falls than rises). Negative: the opposite.">${k > 0 ? "+" : k < 0 ? "−" : ""}${Math.abs(k).toFixed(2)}</span><div class="liq">${k > 0.15 ? "downside tail" : k < -0.15 ? "upside tail" : "balanced"}</div>`;
+
+  function instCard(i) {
+    const sp = i.spot, dec = i.decimals, u = i.unit, iv = i.implied_vol;
+    const stale = sp && sp.stale ? ` <span class="tag-thin" title="Last trade ${esc(new Date(sp.price_at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }))}, ${sp.age_hours}h before this scan: ${esc(sp.stale_reason)}. The gaps below are measured against that last price.">stale · ${esc(sp.stale_reason)}</span>` : "";
+    const volTxt = iv ? `Kalshi implies <b>${iv.ann_vol.toFixed(1)}%</b> annualized vol to ${esc(new Date(iv.close).toLocaleDateString(undefined, { month: "short", day: "numeric" }))}${iv.gauge ? ` vs ${esc(i.gauge.label)} <b>${iv.gauge.price.toFixed(1)}</b> (<span class="${iv.gap > 0 ? "up" : "down"}">${iv.gap > 0 ? "+" : "−"}${Math.abs(iv.gap).toFixed(1)} pts</span>)` : ""}` : "";
+    const rows = i.points.map((p) => {
+      const c = p.change_24h, thin = p.low_confidence ? ` <span class="tag-thin" title="Few liquid strikes, or much of the probability falls outside them. Treat as rough.">thin</span>` : "";
+      return `<tr>
+        <td><a href="https://kalshi.com/markets/${esc(p.event_ticker.split("-")[0].toLowerCase())}" target="_blank" rel="noopener" title="${esc(p.title)}">${esc(mkWhen(p))}</a><div class="kind">${esc(p.kind)} · ${esc(p.event_ticker)}</div></td>
+        <td>${rangeBar(p, sp ? sp.price : null, dec, u)}<div class="liq">10–90% ${mkNum(p.p10, dec, u)} – ${mkNum(p.p90, dec, u)}</div></td>
+        <td class="num"><b>${mkNum(p.median, dec, u)}</b>${thin}</td>
+        <td class="num">${p.spot_gap_pct == null ? `<span class="flat">—</span>` : `<span class="${p.spot_gap_pct > 0 ? "up" : "down"}" title="Kalshi's median against the last price">${mkPct(p.spot_gap_pct)}</span>`}</td>
+        <td class="num">${p.prob_above_spot == null ? `<span class="flat">—</span>` : `<span title="Chance the price finishes above where it trades now">${(p.prob_above_spot * 100).toFixed(0)}%</span>`}</td>
+        <td class="num">${p.sigma_pct == null ? `<span class="flat">—</span>` : `±${p.sigma_pct.toFixed(2)}%`}</td>
+        <td class="num">${p.ann_vol == null ? `<span class="flat" title="Shown for horizons of a day or more with a confident ladder">—</span>` : p.ann_vol.toFixed(1) + "%"}</td>
+        <td class="num">${skewCell(p.skew)}</td>
+        <td class="num">${!c ? `<span class="flat" title="No quotes on the same strikes 24 hours ago">—</span>` : Math.abs(c.median) < 1e-9 ? `<span class="flat">±0</span>` : `<span class="${c.median > 0 ? "up" : "down"}">${c.median > 0 ? "▲" : "▼"} ${mkNum(Math.abs(c.median), dec, u)}</span>`}</td>
+        <td class="num">${compact(p.volume_24h)}</td></tr>`;
+    }).join("");
+    return `<section class="card mk-card" aria-label="${esc(i.label)}">
+      <div class="mk-head"><h2>${esc(i.label)}</h2>
+        ${sp ? `<span class="px">${mkNum(sp.price, dec, u)}</span>${mkMove(sp.change_pct)}${stale}` : `<span class="flat" title="Yahoo Finance had no price for ${esc(i.symbol)} in this scan">no price</span>`}
+        <span class="vol">${volTxt}</span></div>
+      <div class="scroll"><table class="mk-table"><thead><tr><th>Closes</th><th>Kalshi range · price now</th><th class="num">Median</th><th class="num">vs price</th><th class="num">P(above now)</th><th class="num">1σ move</th><th class="num">Implied vol</th><th class="num">Skew</th><th class="num">Median 24h</th><th class="num">24h vol</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  }
+
+  function renderMarkets() {
+    const m = state.data && state.data.markets;
+    $("#mk-count").textContent = m ? m.instruments.length : "";
+    if (!m) {
+      $("#mk-banner").innerHTML = `<div class="empty"><strong>No markets data in this scan</strong>Markets are skipped with <code>--series</code> or <code>--no-markets</code>. Run a full scan to include them.</div>`;
+      $("#mk-kpis").innerHTML = ""; $("#mk-groups").innerHTML = "";
+      return;
+    }
+    const items = m.instruments, withSpot = items.filter((i) => i.spot);
+    const warn = (head, detail) => `<div class="banner review"><span class="icon">⚠️</span><div><div class="headline">${head}</div><div class="detail">${detail}</div></div></div>`;
+    const stale = items.filter((i) => i.spot && i.spot.stale), reasons = [...new Set(stale.map((i) => i.spot.stale_reason))];
+    $("#mk-banner").innerHTML = (!withSpot.length ? warn("Prices unavailable", "Yahoo Finance couldn't be reached in this scan, so Kalshi's distributions are shown without today's price. Gaps, odds of finishing higher and implied volatility need it.") : "")
+      + (stale.length && stale.length * 2 >= withSpot.length ? warn("Prices are stale", `${stale.length} of ${withSpot.length} prices haven't traded recently: ${esc(reasons.join("; "))}. Gaps against the price are measured from the last close.`) : "");
+    const spx = items.find((i) => i.key === "spx"), ivs = items.filter((i) => i.implied_vol && i.implied_vol.gauge);
+    const widest = ivs.slice().sort((a, b) => Math.abs(b.implied_vol.gap) - Math.abs(a.implied_vol.gap))[0];
+    const busiest = items.map((i) => [i, i.points.reduce((s, p) => s + p.volume_24h, 0)]).sort((a, b) => b[1] - a[1])[0];
+    const sv = spx && spx.implied_vol;
+    $("#mk-kpis").innerHTML = [
+      ["Prices tracked", items.length, `of ${m.listed}: indices, commodities and currencies`],
+      ["S&P 500 implied vol", sv ? sv.ann_vol.toFixed(1) + "%" : "—", sv && sv.gauge ? `Kalshi's year-end ladder vs VIX ${sv.gauge.price.toFixed(1)} (${sv.gap > 0 ? "+" : "−"}${Math.abs(sv.gap).toFixed(1)} pts)` : "Needs a confident ladder and a price"],
+      ["Widest gap to its gauge", widest ? `${widest.implied_vol.gap > 0 ? "+" : "−"}${Math.abs(widest.implied_vol.gap).toFixed(1)} pts` : "—", widest ? `${esc(widest.label)}: Kalshi ${widest.implied_vol.ann_vol.toFixed(1)}% vs ${esc(widest.gauge.label)} ${widest.implied_vol.gauge.price.toFixed(1)}` : "No gauge to compare"],
+      ["Prices", withSpot.length ? `${withSpot.length} of ${items.length}` : "—", withSpot.length ? (stale.length ? `${stale.length} stale · ` : "") + `${esc(m.price_source)}, as of ${new Date(m.as_of).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : "Not in this scan"],
+      ["Most traded", busiest ? esc(busiest[0].label) : "—", busiest ? `${compact(busiest[1])} contracts in 24h across shown horizons` : ""],
+    ].map(([l, v, n]) => `<div class="tile"><div class="label">${l}</div><div class="value"${typeof v === "string" && v.length > 9 ? ' style="font-size:20px"' : ""}>${v}</div><div class="note">${n}</div></div>`).join("");
+    const groups = [...new Set(items.map((i) => i.group))];
+    $("#mk-groups").innerHTML = groups.map((g) => `<div class="mk-group">${esc(g)}</div>` + items.filter((i) => i.group === g).map(instCard).join("")).join("");
+  }
+
   function render() {
     renderKpis(); renderArbs(); renderMe();
     if (state.view === "chart") renderNearChart(); else renderNearTable();
-    renderMoved(); renderMacro(); renderEarn();
+    renderMoved(); renderMacro(); renderEarn(); renderMarkets();
     if (state.data) {
       const fm = state.data.fee_model || { label: "Kalshi direct", description: "7% × P × (1−P) taker fee × series multiplier, per order" };
       $("#fee-desc").textContent = `${fm.label}: ${fm.description}`;
@@ -1390,7 +1485,7 @@ footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
   let rz, lastW = window.innerWidth;
   window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; if (state.view === "chart") renderNearChart(); renderMacro(); }, 150); });
   const initial = (location.hash || "").slice(1);
-  showTab(["arb", "moved", "macro", "earn"].includes(initial) ? initial : "moved");
+  showTab(["arb", "moved", "macro", "earn", "markets"].includes(initial) ? initial : "moved");
   poll();
 })();
 </script>

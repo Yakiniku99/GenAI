@@ -68,7 +68,8 @@ def _scan_loop(state: State, args) -> None:
             # The earnings scan is ~400 requests; refresh it on full cycles and carry it over in between.
             with_earnings = full and getattr(args, "earnings", True) and not args.series
             snap = scan(client, args.category, only, args.workers, progress, args.fees, args.depth,
-                        getattr(args, "signals", True), with_earnings)
+                        getattr(args, "signals", True), with_earnings,
+                        getattr(args, "markets", True) and not args.series)
             if not with_earnings and state.snapshot and not args.series:
                 snap["earnings"] = state.snapshot.get("earnings")
                 if snap["earnings"]:

@@ -240,6 +240,19 @@ with a fresh price, so weekends and holidays are skipped. A correlation means th
 the KPI moved the price. Every scan is kept for a week, then one per day for up to 180 days. On GitHub Pages
 the history is published as `history.json` next to the page, and the next build downloads it and adds to it.
 
+## Markets
+
+The Markets tab reads Kalshi's price markets on the S&P 500, Nasdaq-100, WTI and Brent crude, gold, silver,
+natural gas, copper, EUR/USD and USD/JPY: hourly, daily, weekly, monthly and year-end contracts. "Above X"
+ladders and "between X and Y" range sets are both turned into a probability distribution (range sets by
+converting each bucket's lower edge into an "at or above" probability, keeping only buckets with a spread of
+10¢ or less that carry 80% of the probability). For each horizon it shows the median, the 10-90% range,
+the chance of finishing above today's price, the one-standard-deviation move, the volatility that move
+implies (annualized over weekdays, so it sits beside VIX, VXN, OVX and GVZ), the skew of the tails, and the
+24h change in the median. Prices and the vol gauges come from Yahoo Finance's public chart endpoint (no
+key; it rate-limits long browser User-Agent strings, so `markets.py` sends a short one). The price is
+tagged stale across a weekend or market holiday. Skip the tab with `--no-markets`.
+
 ## Informed-flow research
 
 ```bash
@@ -267,6 +280,7 @@ kalshi_arb/
   earnings.py    company KPI ladders, liquidity filter, Nasdaq earnings calendar
   prices.py      stock price moves (24h, extended hours) and stale-price flags
   history.py     saved KPI and price history, KPI-to-price correlation
+  markets.py     index, commodity and FX distributions, implied vol, Yahoo Finance prices
   research.py    the informed-flow study (writes research/ and informed_model.json)
   server.py      stdlib HTTP server + background rescan loop
   static/index.html  the dashboard (no external dependencies)

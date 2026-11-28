@@ -41,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Skip the What moved / shark-watch signals (fewer API calls)")
     common.add_argument("--no-earnings", dest="earnings", action="store_false",
                         help="Skip the Earnings tab (company KPI ladders; ~400 extra API calls, skipped with --series)")
+    common.add_argument("--no-markets", dest="markets", action="store_false",
+                        help="Skip the Markets tab (index, commodity and FX ladders plus Yahoo Finance prices; skipped with --series)")
     common.add_argument("--history", default="history.json", metavar="FILE",
                         help="Where to keep the KPI and stock-price history behind the correlation (default: history.json)")
     common.add_argument("--no-history", dest="history", action="store_const", const=None,
@@ -80,7 +82,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if a.cmd == "scan":
-        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals, a.earnings and not a.series)
+        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals, a.earnings and not a.series,
+                    a.markets and not a.series)
         if snap.get("earnings"):
             track(snap["earnings"], a.history)
         if a.out:
@@ -101,7 +104,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "build":
         from .server import build_static_site
-        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals, a.earnings and not a.series)
+        snap = scan(KalshiClient(rate_per_sec=a.rate), a.category, a.series, a.workers, _print_progress, a.fees, a.depth, a.signals, a.earnings and not a.series,
+                    a.markets and not a.series)
         if snap.get("earnings"):
             track(snap["earnings"], a.history)
         build_static_site(snap, a.out)

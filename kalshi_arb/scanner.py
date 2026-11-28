@@ -13,6 +13,7 @@ from .arbitrage import (DEFAULT_FEE_MODEL, FEE_MODELS, Opportunity, Quote, analy
 from .client import KalshiClient
 from .earnings import KPI_TAG, build_earnings
 from .macro import build_macro
+from .markets import build_markets
 from .prices import refresh as refresh_prices
 from .signals import build_signals
 
@@ -119,6 +120,7 @@ def scan(
     depth_candidates: int = 40,
     signals: bool = True,
     earnings: bool = False,
+    markets: bool = False,
 ) -> dict:
     client = client or KalshiClient()
     started = time.time()
@@ -144,6 +146,10 @@ def scan(
         earn = build_earnings(kpi_events, now)
         refresh_prices(earn)   # current time: the scan's own `now` is minutes old by here
         errors += earn_errors + earn["errors"]
+    mk = None
+    if markets:
+        mk = build_markets(client, workers=min(workers, 6))
+        errors += mk["errors"]
     n_markets = sum(len(e.get("markets") or []) for e in events)
     return {
         "generated_at": now.isoformat(),
@@ -163,5 +169,6 @@ def scan(
         "macro": macro,
         "signals": sig,
         "earnings": earn,
+        "markets": mk,
         "errors": errors,
     }
